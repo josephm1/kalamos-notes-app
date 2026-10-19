@@ -660,7 +660,6 @@ features:
 
 services:
   storage: notes-local
-  recognition: myscript
 
 device:
   supported: [standard, bigme, boox]
