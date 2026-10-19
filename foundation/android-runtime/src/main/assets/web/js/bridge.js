@@ -27,7 +27,7 @@ const Bridge = {
     try { AndroidBridge.setImmersive(!!on) } catch (e) { /* preview: no native bridge */ }
   },
 
-  // ---- Handwriting recognition (shared seam; MyScript iink with per-app fallback) ----
+  // ---- Handwriting recognition (shared seam; optional host provider) ----
   // Async results arrive via window.onHwrEvent(jsonString):
   //   {id, kind:'hwr', type:'result', mode:'text', candidates:[{text}], words:[...]}
   //   {id, kind:'hwr', type:'result', mode:'gesture'|'shape', candidates:[{label}]}

@@ -1,6 +1,6 @@
 # Kalamos Notes
 
-Notes owns its library chrome, creation sheet, routing, samples and per-application MyScript licence.
+Notes owns its library chrome, creation sheet, routing, samples.
 It compiles the shared Android runtime, writing feature and selected device provider.
 
 Every plain notebook now uses the canonical ruled workspace (the former Planning experience).

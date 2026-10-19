@@ -29,7 +29,6 @@ dependencies {
     api("androidx.webkit:webkit:1.9.0")
     api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     api("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.myscript:iink:4.5.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")

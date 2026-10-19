@@ -1,3 +1,7 @@
+> Current update: the unused proprietary recognition integration, certificate and language packs
+> were removed on 19 October 2026. Historical findings below describe the earlier audit. Current
+> public Notes source excludes those private/licensed assets; AI formatting remains Notes-owned.
+
 # Notes code audit — 12 October 2026
 
 18 October amendment: Notes now owns [AI formatting](AI-FORMATTING.md), a narrow provider setup

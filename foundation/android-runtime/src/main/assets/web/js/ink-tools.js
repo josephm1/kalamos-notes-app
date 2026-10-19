@@ -3,7 +3,7 @@
 //   cleanup        "Clean Up Handwriting"  — straighten, align and size words onto the rule lines
 //   perfectShape   "Easy Shape Correction" — replace a sketched line/circle/rect/polygon with a
 //                                            mathematically clean one
-//   recognize      "Handwriting-to-Text"   — HWR via the core Bridge.hwr* seam (MyScript/ML Kit),
+//   recognize      "Handwriting-to-Text"   — HWR via the core Bridge.hwr* seam (optional host provider),
 //                                            usable one-shot or as a realtime convert loop
 //   bindToLine     "Handwriting Help"      — snap the word just written to the reference line and
 //                                            size established by the first word on that line
@@ -247,7 +247,7 @@ function strokeHitsLasso(points, polygon) {
     // Routes hwr events by request id so concurrent recognitions don't cross.
     recognize(strokes, geo, cb) {
       // bridge.js declares a top-level lexical `const Bridge`; it intentionally does not create
-      // window.Bridge. Guard the lexical binding itself or every MyScript request is silently
+      // window.Bridge. Guard the lexical binding itself or every recognition request is silently
       // rejected even when the certificate, SDK and language assets are all present.
       if (typeof Bridge === 'undefined' || !Bridge.hwrRecognize) { cb({ error: 'recognizer unavailable' }); return }
       installHwrRouter()

@@ -7,7 +7,7 @@ val kalamosDevice = providers.gradleProperty("kalamos.device").orElse("standard"
 
 android {
     // Notes retains the historical namespace and application ID so existing on-device notebook
-    // storage, preferences and MyScript licensing continue to resolve unchanged.
+    // storage and preferences continue to resolve unchanged.
     namespace = "com.kalamos.notebook"
     compileSdk = 34
 
@@ -20,9 +20,6 @@ android {
         manifestPlaceholders["inkTrace"] = providers.gradleProperty("kalamos.inkTrace").orElse("false").get()
         ndk { abiFilters += "arm64-v8a" }
     }
-
-    // MyScript reads language resources through a seekable APK asset path.
-    androidResources { noCompress += listOf("res", "conf") }
 
     buildTypes {
         release {

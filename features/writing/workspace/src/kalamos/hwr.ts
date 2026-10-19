@@ -1,5 +1,4 @@
-// Client for the shared Kalamos HWR seam (MyScript iink with per-app
-// fallback; see docs/features/HANDWRITING-RECOGNITION.md). Originally adapted from Notes'
+// Client for the shared Kalamos HWR seam (optional host provider; see docs/features/HANDWRITING-RECOGNITION.md). Originally adapted from Notes'
 // NotesPlanningHWR: request via Bridge.hwrRecognize, correlate the
 // window.onHwrEvent result by reqId, chain any previous event handler.
 

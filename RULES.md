@@ -7,29 +7,18 @@
    may appear.
 3. `features/**` owns reusable product capabilities. Apps configure features; they do not fork them.
 4. `apps/<app>/**` owns the application ID, entry point, branding, overlay, app-only services,
-   samples and per-application licences.
+   samples and app configuration.
 5. Apps must not depend on other apps. There is no vendored `java-core`, `assets-core`, or sync step.
 6. Generated writing JS/CSS is edited only through `features/writing/workspace`; never patch the
    generated files in `features/writing/android` directly.
 7. `BookConverter/**` owns conversion, OCR, audit and package-generation behavior. Android runtime
    and app modules consume its output contract; they must not depend on its local models or runs.
 
-## BookConverter boundary
-
-- Keep converter code and documentation in Git, but never add source books, model weights, local
-  environments, caches, generated runs or archived runs.
-- Those heavy folders are linked to `the retained converter data directory` by
-  `BookConverter/scripts/link_external_assets.sh`; the links are intentionally shared and mutable.
-- Preserve the MinerU-shaped canonical blocks and `vl_pages.json` contract described in
-  `BookConverter/docs/SCHEMA.md`.
-- A browser preview is not conversion QA. Review warning-heavy pages in scan, overlay and reflow,
-  and never silently accept an incomplete page.
-
 ## Device boundary
 
 - Shared runtime code obtains device behavior through `DeviceRegistry` and `DeviceProvider`.
 - Bigme implementation details belong only in `devices/bigme`.
-- Standard Android and Boox are future provider modules, not conditionals scattered through apps.
+- Standard Android is implemented in `devices/standard`; other vendors belong in provider modules, not conditionals scattered through apps.
 - Device selection is compile-time packaging plus provider manifest metadata. A runtime user toggle
   is not a safe substitute for choosing the correct vendor implementation.
 - Browser success never proves native ink or e-ink refresh correctness.
@@ -57,5 +46,4 @@ matrix.
 4. Build affected APKs. Do not claim installation or device acceptance unless it actually happened.
 5. Record a material architecture or device-contract change in `HANDOVER.md`.
 
-MyScript certificate sources are licensed, app-owned material. Keep this repository private unless
-their redistribution terms have been reviewed. Never print certificate contents in logs or docs.
+Never commit provider credentials, user notebooks, device captures, signing keys or local build configuration.

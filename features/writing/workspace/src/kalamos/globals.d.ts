@@ -59,7 +59,7 @@ declare const Bridge: {
     bottom: number
   ): void;
 
-  // HWR (MyScript seam). bridge.js wraps the JSON: args in as object,
+  // HWR (optional host provider). bridge.js wraps the JSON: args in as object,
   // {reqId}|{err} out as object; results arrive via window.onHwrEvent.
   hwrStatus(lang: string): string;
   hwrDownload(lang: string): { reqId?: string; err?: string };

@@ -1,3 +1,15 @@
+## Remove retired MyScript provider — 19 October 2026
+
+Removed the SDK dependency, native recognizer, app certificate and all bundled recognition
+resources. The shared recognition contract reports unavailable without an optional host provider;
+AI formatting and normal pen input remain independent. Standard build/runtime and Notes native
+tests pass. Writing718/typecheck/regeneration pass; the monorepo full apps gate retains its
+unrelated Todo credential assertion. Bigme packaging is checked separately. No installation or
+physical-device acceptance is claimed for this change.
+
+The public source history excludes the retired certificate/resources and local machine paths.
+API credentials, notebooks and build artifacts must remain outside Git.
+
 ## Reusable InkSDK and generic reader contract — 19 October 2026
 
 Shared API/providers now expose optional editing capabilities so KOReader can reuse Notes'
@@ -55,4 +67,4 @@ Latest change: collapsed and compact toolbars now use the enclosing modal as nat
 
 Recent active features include self-contained image-to-Markdown AI formatting, model discovery/thinking settings, in-note result updates, progress/error notifications, generic Android image/Markdown sharing and receipt, formatted Markdown imports, read-only tables/code/rich text, page overview, Home-save and thumbnails. API keys remain in on-device settings.
 
-MyScript resources are private app-owned material; do not publish this repository publicly. Do not add notebook captures, local credentials, build caches or signing keys.
+Do not add notebook captures, local credentials, build caches or signing keys.

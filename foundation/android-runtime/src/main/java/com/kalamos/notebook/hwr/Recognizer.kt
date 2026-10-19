@@ -3,10 +3,8 @@ package com.kalamos.notebook.hwr
 import org.json.JSONObject
 
 /**
- * The handwriting-recognition seam, shared by every app (moved here from kalamos-scribe).
- * MyScript iink is the core engine ([MyScriptRecognizer]); an app can register a fallback
- * engine through [HwrEngines] (Scribe registers ML Kit) — nothing else in an app knows
- * the engine.
+ * Optional handwriting-recognition contract shared by hosts. A host may register an engine
+ * through [HwrEngines]; without one, [NoopRecognizer] reports unavailable and ink stays editable.
  *
  * Stroke format matches the daemon batches JS already has: [[x,y,pressure],...] in box px.
  * Timestamps are optional (the Bigme daemon doesn't provide them) — engines must cope.
@@ -27,7 +25,7 @@ interface Recognizer {
     fun recognize(args: JSONObject): String
 }
 
-/** Fallback when no engine can run (no certificate, unsupported device). Ink stays ink. */
+/** Unavailable provider when no host engine is registered. Ink stays ink. */
 class NoopRecognizer : Recognizer {
     override fun statusSync(lang: String) = "unavailable"
     override fun download(lang: String) = """{"err":"unavailable"}"""

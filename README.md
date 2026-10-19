@@ -1,6 +1,6 @@
 # Kalamos Notes
 
-Private Android notebook app with ruled handwriting, editable Markdown, page overview, AI formatting and Android sharing. Supports standard Android and Bigme e-ink devices.
+Android notebook app with ruled handwriting, editable Markdown, page overview, AI formatting and Android sharing. Supports standard Android and Bigme e-ink devices.
 
 This repository is a self-contained source snapshot of the active Notes app and its shared dependency modules, exported on 19 October 2026 from the Kalamos monorepo. It includes the latest toolbar foreground handoff and single-owner checkbox pen handling. Other Kalamos apps, historical archives, local notebooks, device captures and build outputs are excluded. No sibling checkout is required.
 
@@ -38,6 +38,9 @@ node --test --test-concurrency=1 apps/notes/tests/*.test.mjs
 
 Read `AGENTS.md`, `RULES.md` and `docs/devices/bigme/INK-WRITING-GUIDE.md` before changing native ink behavior. Physical device testing is performed by the owner; browser and unit tests do not establish e-ink panel acceptance.
 
-## Private resources
+## Recognition and privacy
 
-This source includes app-owned MyScript certificate/language resources and bundled vendor assets. Keep this repository private. AI provider URLs, API keys and model settings are entered in Notes; local credentials and user notebooks are not included.
+MyScript is no longer used. The SDK, certificate and language resources have been removed;
+this build does not require a MyScript account or licence. Image-to-Markdown AI formatting
+uses the provider configured in Notes. API keys are entered on device and stored locally.
+User notebooks, device captures, build outputs and signing keys are excluded from source.

@@ -719,10 +719,8 @@ class AndroidBridge(
     }
 
     // ---- Handwriting recognition (shared seam, all apps) -----------------------------------------
-    // Engine choice lives in com.kalamos.notebook.hwr.HwrEngines: MyScript iink when the app ships
-    // a certificate (+ language assets, bundled or downloaded), else the app-registered fallback
-    // (Scribe registers ML Kit), else a Noop that reports "unavailable". Async results arrive via
-    // window.onHwrEvent(json) — same event shapes as Scribe's original hwr.* AppBridge methods.
+    // Hosts may register an optional recognizer. Without one the stable bridge reports unavailable;
+    // handwriting remains ink. AI page formatting has its own independent Notes-owned path.
 
     private val hwr: com.kalamos.notebook.hwr.Recognizer by lazy {
         com.kalamos.notebook.hwr.HwrEngines.create(fragment.requireContext(), ::postHwrEvent)

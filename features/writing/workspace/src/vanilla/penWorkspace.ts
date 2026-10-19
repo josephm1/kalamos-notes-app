@@ -102,7 +102,7 @@ export type HwrResult = {
   words?: HwrWord[];
 };
 
-/** Handwriting-recognition seam (Kalamos MyScript on device; absent in the
+/** Handwriting-recognition seam (optional host provider on device; absent in the
  * browser, which hides the convert action). */
 export type HwrClient = {
   available(): boolean;
