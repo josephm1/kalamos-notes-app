@@ -375,36 +375,6 @@ window.BooxAnnotations = (function() {
     return fallback
   }
 
-  // Quote text for a highlight: only cheaply available for the section currently rendered
-  // (its live flow textContent). For other sections we label by kind + section (no full-book
-  // text extraction — offsets are into the rendered DOM, not the raw block md).
-  function quoteFor(reader, sid, h) {
-    if (reader.sectionId && reader.sectionId() === sid && reader._flow) {
-      var t = reader._flow.textContent || ''
-      var q = t.slice(h.start, h.end).trim()
-      if (q) return q.length > 90 ? q.slice(0, 90) + '…' : q
-    }
-    return null
-  }
-
-  function gatherAnnotations(reader) {
-    var out = []
-    var all = spineSids(reader)
-    var hs = indexedValues(reader, 'highlights', '_sections.json', all)
-    var ns = indexedValues(reader, 'notes', '_sections.json', all)
-    var want = hs.concat(ns).filter(function(sid, i, a) { return a.indexOf(sid) === i })
-    want.forEach(function(sid) {
-      var sc = sidecarOf(reader, sid)
-      var noteRanges = sc.notes.map(function(n) { return n.anchor })
-      sc.hl.forEach(function(h) {
-        var hasNote = noteRanges.some(function(a) { return a && a.start === h.start && a.end === h.end })
-        out.push({ sid: sid, start: h.start, end: h.end, hasNote: hasNote,
-          quote: quoteFor(reader, sid, h), title: sectionTitle(reader, sid) })
-      })
-    })
-    return out
-  }
-
   function gatherNotes(reader) {
     var out = []
     indexedValues(reader, 'notes', '_sections.json', spineSids(reader)).forEach(function(sid) {
@@ -423,43 +393,7 @@ window.BooxAnnotations = (function() {
     if (reader.jumpTo) reader.jumpTo(sid, null)
   }
 
-  // EPUB highlights: same sidecar/highlights store, keyed by spine index (see epub-reader.js AD-10).
-  // Quote text comes from the currently-rendered chapter's flow (offsets are into that DOM text).
-  function gatherEpubAnnotations(reader) {
-    var out = []
-    var spine = (reader.manifest && reader.manifest.spine) || []
-    var indexes = indexedValues(reader, 'highlights', '_spines.json', spine.map(function(_, i) { return i }))
-    for (var ii = 0; ii < indexes.length; ii++) {
-      var i = indexes[ii]
-      var arr = []
-      try { arr = JSON.parse(Bridge.getBookFile(reader.nbId, 'sidecar/highlights/' + i + '.json') || '[]') } catch (e) {}
-      var title = (spine[i] && spine[i].title) || ('Chapter ' + (i + 1))
-      var here = (reader.spineIdx === i && reader._flow) ? (reader._flow.textContent || '') : null
-      arr.forEach(function(h) {
-        var q = here ? here.slice(h.start, h.end).trim() : null
-        if (q && q.length > 90) q = q.slice(0, 90) + '…'
-        out.push({ epubSpine: i, start: h.start, end: h.end, quote: q, title: title })
-      })
-    }
-    return out
-  }
 
-  // PDF text highlights are stored by PdfReader's selectable article mode. Legacy raster rectangles
-  // may still exist from earlier builds, so keep listing them as page-area highlights.
-  function gatherPdfAnnotations(reader) {
-    var out = []
-    if (reader.gatherTextHighlights) {
-      reader.gatherTextHighlights().forEach(function(h) {
-        out.push({ pdfPage: h.page, pdfText: true, quote: h.quote || 'Text highlight', title: 'Page ' + (h.page + 1) })
-      })
-    }
-    if (window.BooxPdfAnnots) {
-      BooxPdfAnnots.gatherHighlights(reader).forEach(function(h) {
-        out.push({ pdfPage: h.page, quote: h.quote || 'Area highlight', hasNote: h.hasNote, title: 'Page ' + (h.page + 1) })
-      })
-    }
-    return out
-  }
 
   function buildAnnotations(reader, body) {
     if (Array.isArray(reader._bxAnnotationsCache)) { renderAnnotationItems(reader, body, reader._bxAnnotationsCache); return }
