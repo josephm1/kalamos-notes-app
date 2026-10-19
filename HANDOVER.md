@@ -1,3 +1,12 @@
+## Protect new handwriting in blank areas — 19 October 2026
+
+Native delivery now snapshots eligible old ink IDs once before ingesting a stroke batch. Later
+strokes cannot erase earlier fresh strokes from that same batch; with no old ink or typed text,
+scribble recognition is bypassed. Word-level erase expansion also honors eligibility. A later
+batch can erase the written word normally. No gesture thresholds/classifier or native daemon
+lifecycle changes.713 writing tests pass, including blank paper, older ink elsewhere, later erase
+and Undo, and old-word expansion preserving fresh strokes. Physical device testing is user-owned.
+
 ## Pen checkbox marks — 19 October 2026
 
 Native checkbox gestures accept a short tick/X starting on the control, including a bounded

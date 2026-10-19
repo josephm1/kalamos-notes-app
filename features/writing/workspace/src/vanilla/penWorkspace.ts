@@ -2416,7 +2416,7 @@ export class PenWorkspace {
    * by the ink daemon after a pen pause) through the active tool. Drag tools
    * apply the whole gesture at once: the stroke IS the drag path.
    */
-  applyNativeWriteStroke(points: InkPoint[], render = true, checkboxGestures = new Set<string>()): ScribbleResult | {kind:"widget";rect:{x:number;y:number;w:number;h:number}} | null {
+  applyNativeWriteStroke(points: InkPoint[], render = true, checkboxGestures = new Set<string>(), existingInk?:ReadonlySet<string>): ScribbleResult | {kind:"widget";rect:{x:number;y:number;w:number;h:number}} | null {
     if (points.length === 0) return null;
     // Checkbox taps and short drawn marks delivered by the daemon are controls, not saved ink.
     // The caller replaces only this small region through the existing native
@@ -2441,7 +2441,7 @@ export class PenWorkspace {
       const x=Math.min(left,bounds.x),y=Math.min(top,bounds.y);
       return {kind:"widget", rect:{x,y,w:Math.max(right,bounds.x+bounds.width)-x,h:Math.max(bottom,bounds.y+bounds.height)-y}};
     }
-    const erased = this.eraseScribble(points, false, render);
+    const erased = this.eraseScribble(points, false, render, undefined, existingInk);
     if (erased) return erased;
     const first = points[0];
     this.pushHistory();
@@ -2804,7 +2804,18 @@ export class PenWorkspace {
     this.eraseLassoEl.replaceChildren(path);
   }
 
-  eraseScribble(points: InkPoint[], historyPushed = false, render = true, staged?: { strokes: InkStroke[]; restore: (strokes: InkStroke[]) => void }): ScribbleResult | null {
+  /** Native delivery can contain a whole new word. Freeze eligibility before ingesting its
+   * strokes so fresh writing in blank space cannot erase itself later in the same batch. */
+  snapshotScribbleInkTargets(): ReadonlySet<string> {
+    return new Set([
+      ...this.doc.inserts.flatMap(ins=>ins.kind==='ink'?ins.strokes.map(stroke=>stroke.id):[]),
+      ...(this.doc.pageObjects??[]).flatMap(object=>(object.ink??[]).map(stroke=>stroke.id)),
+    ]);
+  }
+
+  eraseScribble(points: InkPoint[], historyPushed = false, render = true, staged?: { strokes: InkStroke[]; restore: (strokes: InkStroke[]) => void }, existingInk?:ReadonlySet<string>): ScribbleResult | null {
+    // With no old ink or typed text there is nothing to erase, regardless of stroke shape.
+    if(existingInk?.size===0 && !this.doc.textBoxes?.some(box=>!box.checkbox&&box.text.trim()))return null;
     if (!scribble.candidate(points, this.lineHeight)) return null;
     const paperOwner=[...(this.doc.pageObjects??[])].reverse().find(o=>isPaperObject(o)&&objectContains(o,points[0]));
     const wordGroups: number[][] = [];
@@ -2813,16 +2824,17 @@ export class PenWorkspace {
       if (ins.kind !== "ink" || paperOwner) continue;
       const visual = this.inkVisualBounds(ins);
       if (!visual) continue;
+      const strokes=existingInk?ins.strokes.filter(stroke=>existingInk.has(stroke.id)):ins.strokes;
       const firstIndex = placed.length;
-      for (const stroke of ins.strokes) placed.push({ id: stroke.id, width: stroke.width,
+      for (const stroke of strokes) placed.push({ id: stroke.id, width: stroke.width,
         points: stroke.points.map(p => ({ x: p.x + visual.x - visual.localX, y: p.y + visual.y - visual.localY })) });
-      const indexes = new Map(ins.strokes.map((stroke,i) => [stroke.id,firstIndex+i]));
-      wordGroups.push(...clusterInkStrokesByWord(ins.strokes,this.lineHeight,visual.y-visual.localY)
+      const indexes = new Map(strokes.map((stroke,i) => [stroke.id,firstIndex+i]));
+      wordGroups.push(...clusterInkStrokesByWord(strokes,this.lineHeight,visual.y-visual.localY)
         .map(group => group.map(stroke => indexes.get(stroke.id)!)));
     }
     for(const object of this.doc.pageObjects??[]) {
       if(paperOwner && object.id!==paperOwner.id)continue;
-      const strokes=objectInkOnPage(object), firstIndex=placed.length;
+      const strokes=objectInkOnPage(object).filter(stroke=>!existingInk||existingInk.has(stroke.id)), firstIndex=placed.length;
       for(const stroke of strokes)placed.push({id:stroke.id,width:stroke.width,points:stroke.points});
       const indexes=new Map(strokes.map((stroke,i)=>[stroke.id,firstIndex+i]));
       wordGroups.push(...clusterInkStrokesByWord(strokes,this.lineHeight).map(group=>group.map(stroke=>indexes.get(stroke.id)!)));
@@ -2862,7 +2874,7 @@ export class PenWorkspace {
       if (!visual) continue;
       // Use the SAME word partition as selection/movement, including delayed dots and crossbars.
       // A lasso/legacy/Zoom insert may contain several words: do not delete its whole phrase.
-      const groups = clusterInkStrokesByWord(ins.strokes, this.lineHeight, visual.y - visual.localY);
+      const groups = clusterInkStrokesByWord(ins.strokes.filter(stroke=>!existingInk||existingInk.has(stroke.id)), this.lineHeight, visual.y - visual.localY);
       for (const group of groups) {
         if (!group.some(stroke => ids.has(stroke.id))) continue;
         for (const stroke of group) {

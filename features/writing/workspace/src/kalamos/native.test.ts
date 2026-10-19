@@ -1215,8 +1215,10 @@ it('native checkbox batches suppress nested hooks and update only the checkbox f
   const surface=document.createElement('div');
   const native=new Write2Native();
   const gestures:Set<string>[]=[];
-  const ws={currentTool:'write',containerElement:surface,magnifyOpen:false,getNativeInkStrokes:()=>[],applyNativeWriteStroke:(_points:unknown,_render:boolean,batch:Set<string>)=>{
+  const snapshots:ReadonlySet<string>[]=[],snapshotScribbleInkTargets=vi.fn(()=>new Set(['old-ink']));
+  const ws={currentTool:'write',containerElement:surface,magnifyOpen:false,getNativeInkStrokes:()=>[],snapshotScribbleInkTargets,applyNativeWriteStroke:(_points:unknown,_render:boolean,batch:Set<string>,existing:ReadonlySet<string>)=>{
     gestures.push(batch);
+    snapshots.push(existing);
     native.hooks().onWorkspaceLayout?.();
     native.hooks().onWorkspaceContentRegion?.({l:260,t:112,r:308,b:168});
     return {kind:'widget',rect:{x:260,y:112,w:48,h:56}};
@@ -1224,11 +1226,13 @@ it('native checkbox batches suppress nested hooks and update only the checkbox f
   Object.assign(native,{ws,attached:true,dpr:1,boxL:0,boxT:0,boxR:320,boxB:700,boxW:320,boxH:700});
   native.onNoteStrokes([[[280,130,.5]],[[290,140,.5]]]);vi.advanceTimersByTime(32);
   expect(gestures).toHaveLength(2);expect(gestures[0]).toBe(gestures[1]);
+  expect(snapshotScribbleInkTargets).toHaveBeenCalledOnce();expect(snapshots[0]).toBe(snapshots[1]);
   expect(bridge.snapshotContentPartial).toHaveBeenCalledOnce();
   expect(bridge.snapshotContentPartial).toHaveBeenCalledWith(0,0,320,700,260,112,308,168);
   expect(bridge.snapshotContent).not.toHaveBeenCalled();
   native.onNoteStrokes([[[280,130,.5]]]);
   expect(gestures[2]).not.toBe(gestures[0]);
+  expect(snapshots[2]).not.toBe(snapshots[0]);
   delete (globalThis as any).Bridge;vi.useRealTimers();
 });
 

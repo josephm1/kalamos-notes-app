@@ -2164,6 +2164,41 @@ describe('saved Planning lanes across screens', () => {
 
 describe('scribble erase transactions', () => {
   const sweep = (x:number,y:number): InkPoint[] => Array.from({length:7},(_,i)=>({x:x+(i%2 ? 45 : -45),y:y-6+i*2,t:i*4,pressure:.5}));
+  it('keeps a new multi-stroke word on blank paper, then permits a later scribble over it',()=>{
+    const ws=makeWorkspace('\u200b');
+    const firstBatch=ws.snapshotScribbleInkTargets();
+    expect(firstBatch.size).toBe(0);
+    ws.applyNativeWriteStroke(line(80,50,80,80),false,new Set(),firstBatch);
+    const p=ws.getNativeInkStrokes()[0].pts[4];
+    expect(ws.applyNativeWriteStroke(sweep(p.x,p.y),false,new Set(),firstBatch)).toBeNull();
+    expect(ws.getNativeInkStrokes()).toHaveLength(2);
+    const nextBatch=ws.snapshotScribbleInkTargets();
+    expect(ws.applyNativeWriteStroke(sweep(p.x,p.y),false,new Set(),nextBatch)).not.toBeNull();
+    expect(ws.getNativeInkStrokes()).toHaveLength(0);
+    ws.magnifyUndo();expect(ws.getNativeInkStrokes()).toHaveLength(2);
+    ws.destroy();
+  });
+  it('a new blank-area word stays protected even with older ink elsewhere on the page',()=>{
+    const ws=makeWorkspace('\u200b');
+    ws.applyNativeWriteStroke(line(250,50,250,80));
+    const before=ws.getNativeInkStrokes(),batch=ws.snapshotScribbleInkTargets();
+    ws.applyNativeWriteStroke(line(80,50,80,80),false,new Set(),batch);
+    const p=ws.getNativeInkStrokes()[1].pts[4];
+    expect(ws.applyNativeWriteStroke(sweep(p.x,p.y),false,new Set(),batch)).toBeNull();
+    expect(ws.getNativeInkStrokes()).toHaveLength(3);
+    expect(ws.getNativeInkStrokes()[0]).toEqual(before[0]);
+    ws.destroy();
+  });
+  it('whole-word erase expansion does not pull fresh same-batch strokes into an old target',()=>{
+    const ws=makeWorkspace('\u200b');
+    ws.applyNativeWriteStroke(line(80,50,80,80));
+    const p=ws.getNativeInkStrokes()[0].pts[4],batch=ws.snapshotScribbleInkTargets();
+    ws.applyNativeWriteStroke(line(98,50,98,80),false,new Set(),batch);
+    const fresh=ws.getNativeInkStrokes()[1];
+    expect(ws.applyNativeWriteStroke(sweep(p.x,p.y),false,new Set(),batch)).not.toBeNull();
+    expect(ws.getNativeInkStrokes()).toEqual([fresh]);
+    ws.destroy();
+  });
   it.each([true,false])('scribbles an AI task word on its ruled position and Undo restores paired controls (render=%s)',render=>{
     const boxes:import('../sidecar/schema').TextBox[]=[
       {id:'ai-task',blockId:'planning-document',text:'Buy milk',x:16,y:0,width:240,size:27,semantic:{id:'task',type:'task',role:'text'}},
