@@ -51,13 +51,6 @@ window.NativePages = (function() {
     if (!reader._kp) init(reader, kind)
     return reader._kp.pages.filter(function(p) { return anchorMatches(reader, p, kind) })
   }
-  function sameAnchorPages(reader, entry) {
-    var key = JSON.stringify(entry && entry.after || null)
-    return reader._kp.pages.filter(function(p) {
-      if (JSON.stringify(p.after || null) !== key) return false
-      return entry && entry.groupId ? p.groupId === entry.groupId : !p.groupId
-    })
-  }
   function allAnchorPages(reader, entry) {
     var key = JSON.stringify(entry && entry.after || null)
     return reader._kp.pages.filter(function(p) {

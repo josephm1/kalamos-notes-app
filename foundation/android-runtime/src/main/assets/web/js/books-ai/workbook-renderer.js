@@ -2151,23 +2151,6 @@
     host.appendChild(section)
   }
 
-  function wireRevealPageTurns(node, reader) {
-    var startX = 0, startY = 0, moved = false, target = null
-    node.addEventListener('pointerdown', function(event) {
-      if (event.pointerType === 'pen') { target = null; return }
-      startX = event.clientX; startY = event.clientY; moved = false; target = event.target
-    })
-    node.addEventListener('pointermove', function(event) {
-      if (Math.abs(event.clientX - startX) > 8 || Math.abs(event.clientY - startY) > 8) moved = true
-    })
-    node.addEventListener('pointerup', function(event) {
-      if (event.pointerType === 'pen' || moved || !target) return
-      if (target.closest && target.closest('button,a,input,select,textarea,canvas,.wb-ink-region')) return
-      var bounds = node.getBoundingClientRect(), x = event.clientX - bounds.left
-      if (x < bounds.width * .33 && reader && typeof reader.prevPage === 'function') reader.prevPage()
-      else if (x > bounds.width * .67 && reader && typeof reader.nextPage === 'function') reader.nextPage()
-    })
-  }
 
   function renderRevealActivity(container, entry, reader, spec, activity, state) {
     var promptText = presentationPrompt(activity)

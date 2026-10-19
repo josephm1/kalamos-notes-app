@@ -44,15 +44,6 @@ function createFolder(name, parentFolderId) {
   }
 }
 
-function createStroke(tool, color, width, points) {
-  return {
-    id: 's-' + uid(),
-    tool: tool || 'pen',
-    color: color || '#111111',
-    width: width || 3,
-    points: points || []
-  }
-}
 
 function validateNotebook(data) {
   if (!data || !data.pages || !Array.isArray(data.pages) || data.pages.length === 0) return false

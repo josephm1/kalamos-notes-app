@@ -1223,17 +1223,6 @@ function hitTestAll(ex, ey) {
   return null
 }
 
-// Called from native after a live eraser swipe. [indices] = stroke indices the native surface
-// already rubbed out (it hit-tests live); drop them from the vector model so save/undo stay in sync.
-// Indices match page.strokes order because native flushes pending strokes before erasing.
-function updateEraserCursor(x, y) {
-  const eraserRadius = 12
-  eraserCursor.style.width = (eraserRadius * 2) + 'px'
-  eraserCursor.style.height = (eraserRadius * 2) + 'px'
-  eraserCursor.style.left = x + 'px'
-  eraserCursor.style.top = y + 'px'
-  eraserCursor.style.display = 'block'
-}
 
 function hideEraserCursor() {
   eraserCursor.style.display = 'none'

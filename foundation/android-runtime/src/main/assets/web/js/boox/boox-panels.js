@@ -544,15 +544,6 @@ window.BooxAnnotations = (function() {
     }).catch(function() { reader._bxAnnotationMigration = null })
   }
 
-  function buildAnnotationsNow(reader, body) {
-    var items = reader._bxKind === 'book' ? gatherAnnotations(reader)
-      : reader._bxKind === 'epub' ? gatherEpubAnnotations(reader)
-      : reader._bxKind === 'pdf' ? gatherPdfAnnotations(reader) : null
-    if (!items) { empty(body, 'Annotations aren’t available for this format yet.'); return }
-    reader._bxAnnotationsCache = items
-    saveCatalog(reader, items)
-    renderAnnotationItems(reader, body, items)
-  }
 
   function renderAnnotationItems(reader, body, items) {
     if (!items.length) { empty(body, 'No annotations yet.\n' + (reader._bxKind === 'pdf'
@@ -1008,15 +999,6 @@ window.BooxNav = (function() {
     setTextbookMode(reader, true, true)
   }
 
-  function setPreset(reader, id) {
-    var sp = split(reader)
-    sp.preset = id
-    sp.on = id !== '1x1'
-    reader.vs.textbookMode = false
-    reader._bxCell = 0
-    if (sp.on) { ensureWrapped(reader); reader.vs.columns = 1 }  // spread + split are mutually exclusive
-    if (reader._onViewChanged) reader._onViewChanged(); else reader.loadPage()
-  }
 
   // ---- visual Navigation crop editor -------------------------------------------------------------
   // All changes stay in a draft until Apply. The page miniature shows the retained crop and the

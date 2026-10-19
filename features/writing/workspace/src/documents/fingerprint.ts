@@ -26,7 +26,3 @@ export function fingerprintOf(text: string, lastModified = Date.now()): FileFing
     lastModified,
   };
 }
-
-export function fingerprintsMatch(a: FileFingerprint, b: FileFingerprint): boolean {
-  return a.hash === b.hash && a.size === b.size;
-}

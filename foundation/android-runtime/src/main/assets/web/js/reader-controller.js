@@ -1033,40 +1033,5 @@ function drawRangeInto(layer, range, cls) {
   return { l: minL, t: minT, r: maxR, b: maxB }
 }
 
-// A small drawing canvas bound to a normalized stroke array (points in 0..1 of the box, so the
-// drawing scales when the note toggles full screen). High-contrast black ink; draws each segment
-// incrementally (light for e-ink), full redraw only on resize.
-function makeSketchPad(container, strokes, onChange) {
-  const canvas = document.createElement('canvas'); canvas.className = 'rd-sketch-canvas'
-  container.appendChild(canvas)
-  const ctx = canvas.getContext('2d')
-  let cur = null
-  const dpr = function() { return window.devicePixelRatio || 1 }
-  function seg(a, b) {
-    ctx.strokeStyle = '#000'; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 2.5 * dpr()
-    ctx.beginPath(); ctx.moveTo(a.x * canvas.width, a.y * canvas.height); ctx.lineTo(b.x * canvas.width, b.y * canvas.height); ctx.stroke()
-  }
-  function dot(p) { ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(p.x * canvas.width, p.y * canvas.height, 1.4 * dpr(), 0, 7); ctx.fill() }
-  function redraw() {
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height)
-    strokes.forEach(function(s) { if (s.length === 1) dot(s[0]); else for (let i = 1; i < s.length; i++) seg(s[i - 1], s[i]) })
-  }
-  function resize() {
-    const r = container.getBoundingClientRect()
-    if (r.width < 2) { requestAnimationFrame(resize); return }
-    canvas.width = Math.round(r.width * dpr()); canvas.height = Math.round(r.height * dpr())
-    canvas.style.width = r.width + 'px'; canvas.style.height = r.height + 'px'
-    redraw()
-  }
-  function pos(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height } }
-  canvas.addEventListener('pointerdown', function(e) { cur = [pos(e)]; strokes.push(cur); canvas.setPointerCapture(e.pointerId); dot(cur[0]); e.preventDefault() })
-  canvas.addEventListener('pointermove', function(e) { if (!cur) return; const p = pos(e); seg(cur[cur.length - 1], p); cur.push(p); e.preventDefault() })
-  const end = function() { if (cur) { cur = null; onChange && onChange() } }
-  canvas.addEventListener('pointerup', end)
-  canvas.addEventListener('pointercancel', end)
-  canvas.addEventListener('pointerleave', end)
-  resize()
-  return { resize: resize, redraw: redraw }
-}
 
 window.Reader = Reader
