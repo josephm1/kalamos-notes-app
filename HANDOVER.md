@@ -2,9 +2,10 @@
 
 Removed the SDK dependency, native recognizer, app certificate and all bundled recognition
 resources. The shared recognition contract reports unavailable without an optional host provider;
-AI formatting and normal pen input remain independent. Standard build/runtime and Notes native
-tests pass. Writing718/typecheck/regeneration pass; the monorepo full apps gate retains its
-unrelated Todo credential assertion. Bigme packaging is checked separately. No installation or
+AI formatting and normal pen input remain independent. Standard and Bigme APK builds, runtime and Notes native
+tests pass; the independent Standard export also builds and tests without MyScript.
+Writing718/typecheck/regeneration pass; the monorepo full apps gate retains its
+unrelated Todo credential assertion. Rebuilt APKs contain no MyScript assets, native libraries or classes. No installation or
 physical-device acceptance is claimed for this change.
 
 The public source history excludes the retired certificate/resources and local machine paths.
