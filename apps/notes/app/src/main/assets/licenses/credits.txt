@@ -1,0 +1,11 @@
+Kalamos Notes — independently maintained Android notebook app.
+
+This distribution is licensed under GNU GPL version 3; see gpl-v3.txt.
+Matching source, build scripts and third-party notices:
+https://github.com/josephm1/kalamos-notes-app
+
+Ink contracts, defaults, performance counters and Bigme ink work build on
+InkSDK by Ed Wei (imedwei) and contributors: https://github.com/imedwei/inksdk
+The Kalamos ink adaptation is GPLv3. Original authors retain their copyright.
+AndroidX, AndroidHiddenApiBypass and the Gradle wrapper retain Apache-2.0 terms;
+see apache-v2.txt. Other bundled components retain their original notices.

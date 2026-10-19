@@ -44,3 +44,12 @@ MyScript is no longer used. The SDK, certificate and language resources have bee
 this build does not require a MyScript account or licence. Image-to-Markdown AI formatting
 uses the provider configured in Notes. API keys are entered on device and stored locally.
 User notebooks, device captures, build outputs and signing keys are excluded from source.
+
+## Licence and downloads
+
+Kalamos Notes and its original shared source in this distribution use **[GNU GPLv3](LICENSE)**.
+Third-party files retain their own licences and notices, including the optional reader bridge
+and vendor dependencies. [InkSDK attribution and terms](docs/licensing/INKSDK.md) credit Ed Wei
+and the original InkSDK contributors. Public APKs and their matching source are available under
+[Releases](https://github.com/josephm1/kalamos-notes-app/releases). Generic and Bigme APKs are
+separate alternatives; install the one intended for your hardware.
