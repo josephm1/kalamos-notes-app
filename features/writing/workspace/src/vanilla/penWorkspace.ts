@@ -2416,9 +2416,9 @@ export class PenWorkspace {
    * by the ink daemon after a pen pause) through the active tool. Drag tools
    * apply the whole gesture at once: the stroke IS the drag path.
    */
-  applyNativeWriteStroke(points: InkPoint[], render = true): ScribbleResult | {kind:"widget";rect:{x:number;y:number;w:number;h:number}} | null {
+  applyNativeWriteStroke(points: InkPoint[], render = true, checkboxGestures = new Set<string>()): ScribbleResult | {kind:"widget";rect:{x:number;y:number;w:number;h:number}} | null {
     if (points.length === 0) return null;
-    // Checkbox taps delivered by the daemon are controls, not saved ink.
+    // Checkbox taps and short drawn marks delivered by the daemon are controls, not saved ink.
     // The caller replaces only this small region through the existing native
     // composition transaction; ordinary strokes still do no DOM work.
     for (const placed of this.layout.placed) {
@@ -2426,11 +2426,20 @@ export class PenWorkspace {
       const box = this.doc.textBoxes?.find(b => b.id === placed.textBoxId && b.checkbox);
       if (!box) continue;
       const top = placed.line*this.lineHeight;
-      if (!points.every(p => p.x >= placed.x-4 && p.x <= placed.x+44 && p.y >= top && p.y <= top+this.lineHeight)) continue;
-      const bounds = boundsOfPoints(points);
-      if (bounds.width > 25 || bounds.height > 25) continue;
-      this.toggleChecklist(box.id);
-      return {kind:"widget", rect:{x:placed.x-4,y:top,w:48,h:this.lineHeight}};
+      const left=placed.x-4,right=placed.x+44,bottom=top+this.lineHeight,first=points[0];
+      // Contact must begin on this control. Allow a tick's short outgoing tail, but never
+      // capture handwriting approaching from the task text or a drag across other rows.
+      if (first.x < left || first.x > right || first.y < top || first.y > bottom) continue;
+      if (!points.every(p => p.x >= left-12 && p.x <= right+16 && p.y >= top-12 && p.y <= bottom+12)) continue;
+      // An X can have two strokes in one native batch. It is still one checkbox action.
+      if (!checkboxGestures.has(box.id)) {
+        this.toggleChecklist(box.id);
+        checkboxGestures.add(box.id);
+      }
+      // Erase the complete temporary mark, including the part outside the control face.
+      const bounds=boundsOfPoints(points,Math.max(4,this.penWidth));
+      const x=Math.min(left,bounds.x),y=Math.min(top,bounds.y);
+      return {kind:"widget", rect:{x,y,w:Math.max(right,bounds.x+bounds.width)-x,h:Math.max(bottom,bounds.y+bounds.height)-y}};
     }
     const erased = this.eraseScribble(points, false, render);
     if (erased) return erased;

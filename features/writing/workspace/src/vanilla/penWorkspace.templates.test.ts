@@ -32,12 +32,57 @@ it('native checkbox taps are controls, save/reopen checked, and Undo never loses
   expect(reopened.host.querySelector('[role=checkbox]')?.getAttribute('aria-checked')).toBe('true');
   ws.magnifyUndo();expect(ws.reflowDoc.textBoxes!.find(b=>b.checkbox)?.text).toBe('☐');
 });
+it('a drawn pen tick toggles and clears its outgoing tail without saving ink',async()=>{
+  const {ws,host,saved}=open();
+  const box=ws.reflowDoc.textBoxes!.find(b=>b.checkbox)!;
+  const points=[{x:280,y:box.y+22,t:1,pressure:.5},{x:291,y:box.y+38,t:2,pressure:.5},{x:328,y:box.y-6,t:3,pressure:.5}];
+  const result=ws.applyNativeWriteStroke(points,false);
+  expect(result).toMatchObject({kind:'widget'});
+  expect(result!.rect.x+result!.rect.w).toBeGreaterThan(328);
+  expect(result!.rect.y).toBeLessThan(box.y-6);
+  expect(host.querySelector('[role=checkbox]')?.getAttribute('aria-checked')).toBe('true');
+  expect(ws.getNativeInkStrokes()).toHaveLength(0);
+  await ws.checkpoint();expect(saved().newRuns).toHaveLength(0);
+  ws.applyNativeWriteStroke([{x:280,y:box.y+22,t:4,pressure:.5}],false);
+  expect(host.querySelector('[role=checkbox]')?.getAttribute('aria-checked')).toBe('false');
+  ws.magnifyUndo();expect(ws.reflowDoc.textBoxes!.find(b=>b.checkbox)?.text).toBe('☑');
+});
+it('two strokes of one checkbox mark toggle once per native batch, independently for each control',()=>{
+  const {ws}=open(),batch=new Set<string>();
+  const boxes=ws.reflowDoc.textBoxes!.filter(b=>b.checkbox);
+  const mark=(y:number)=>[{x:280,y:y+14,t:1,pressure:.5},{x:309,y:y+40,t:2,pressure:.5}];
+  ws.applyNativeWriteStroke(mark(boxes[0].y),false,batch);
+  ws.applyNativeWriteStroke(mark(boxes[0].y).reverse(),false,batch);
+  ws.applyNativeWriteStroke(mark(boxes[1].y),false,batch);
+  expect(ws.reflowDoc.textBoxes!.filter(b=>b.checkbox).slice(0,2).map(b=>b.text)).toEqual(['☑','☑']);
+  expect(ws.getNativeInkStrokes()).toHaveLength(0);
+});
+it('handwriting entering a checkbox from outside and long outgoing strokes remain ink',()=>{
+  for(const coords of [[[230,135],[280,140]],[[280,135],[390,140]],[[280,135],[290,220]]]) {
+    const {ws}=open();
+    const result=ws.applyNativeWriteStroke(coords.map(([x,y],t)=>({x,y,t,pressure:.5})),false);
+    expect(result).toBeNull();
+    expect(ws.reflowDoc.textBoxes!.filter(b=>b.checkbox).every(b=>b.text==='☐')).toBe(true);
+    expect(ws.getNativeInkStrokes()).toHaveLength(1);
+  }
+});
 it('finger checklist taps remain checked when vertical spacing moves their row',async()=>{
   const {ws,host,saved}=open();host.querySelector<HTMLButtonElement>('[role=checkbox]')!.click();
   const id=ws.reflowDoc.textBoxes!.find(b=>b.checkbox)!.id;
   ws.setActiveTool('lines');pointer(ws,'pointerdown',20,70);pointer(ws,'pointermove',20,182);pointer(ws,'pointerup',20,182);
   await ws.checkpoint();const box=saved().textBoxes!.find(b=>b.id===id)!;
   expect(box.text).toBe('☑');expect(box.words![0].y).toBeGreaterThan(112);
+});
+it('WebView pen release activates a checkbox once without a compatibility click saving ink',()=>{
+  const {ws,host}=open(),button=host.querySelector<HTMLButtonElement>('[role=checkbox]')!;
+  for(const type of ['pointerdown','pointerup']) {
+    const event=new MouseEvent(type,{bubbles:true});
+    Object.defineProperties(event,{pointerType:{value:'pen'},pointerId:{value:99}});
+    button.dispatchEvent(event);
+  }
+  button.click();
+  expect(host.querySelector('[role=checkbox]')?.getAttribute('aria-checked')).toBe('true');
+  expect(ws.getNativeInkStrokes()).toHaveLength(0);
 });
 it('free shapes draw, save, export, remain independent of line spacing, and Undo',async()=>{
   const {ws,host,saved}=open('ruled');click(host,'Shapes / free drawing');click(host,'Rectangle');

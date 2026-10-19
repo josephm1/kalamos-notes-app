@@ -576,6 +576,7 @@ export class Write2Native {
     const offset = this.paperOffset(ws);
     const t0 = performance.now();
     const selectionBatch=!magnify && this.usesSelectionPen(ws);
+    const checkboxGestures=new Set<string>();
     for (const s of strokes) {
       if (!s || s.length === 0) continue;
       const pts: InkPoint[] = s.map((p, i) => ({
@@ -613,7 +614,7 @@ export class Write2Native {
         // below. Suppress nested layout/region hooks from issuing another bake.
         this.nativeBatchLayoutOwned = true;
         let changed: ReturnType<PenWorkspace["applyNativeWriteStroke"]>;
-        try { changed = ws.applyNativeWriteStroke(pts, false); }
+        try { changed = ws.applyNativeWriteStroke(pts, false, checkboxGestures); }
         finally { this.nativeBatchLayoutOwned = false; }
         if (changed) {
           const x = changed.rect.x + offset.x - el.scrollLeft;
