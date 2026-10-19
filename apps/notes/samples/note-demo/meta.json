@@ -1,0 +1,298 @@
+{
+ "notebookId": "note-demo",
+ "title": "Component Demo",
+ "folderId": "",
+ "createdAt": "2026-06-30T00:00:00.000Z",
+ "updatedAt": "2026-06-30T00:00:00.000Z",
+ "defaultTemplate": "blank",
+ "pages": [
+  {
+   "pageId": "p-text",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "# Component Demo\n\nA test notebook that exercises **every interactive component**, one per page, so you can rapidly check rendering and behaviour in the preview (`./ui.sh notes`). Page-turn buttons move between pages.\n\n## Text & markdown\nText blocks render markdown: *italic*, **bold**, `code`, and lists:\n\n- first item\n- second item\n- third item\n\nDrag the stylus or a finger across this paragraph to test **highlighting**; hold on a highlight for the **sticky-note** menu."
+    }
+   ]
+  },
+  {
+   "pageId": "p-image",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "## Image block\n\nImages load from the notebook's own assets via the bridge. Below: `fit: contain` with a caption, then `fit: cover`."
+    },
+    {
+     "type": "image",
+     "src": "koch.jpg",
+     "alt": "Demo portrait",
+     "caption": "An image block (fit: contain) with a caption.",
+     "fit": "contain"
+    },
+    {
+     "type": "image",
+     "src": "world-map.png",
+     "alt": "Demo map",
+     "caption": "A second image (fit: cover).",
+     "fit": "cover"
+    }
+   ]
+  },
+  {
+   "pageId": "p-mcq",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "## MCQ blocks\n\nTap a choice, then **Check** to grade + reveal the explanation. First is single-answer, second is multi-answer."
+    },
+    {
+     "type": "mcq",
+     "prompt": "Which of these is a primary colour?",
+     "choices": [
+      {
+       "id": "a",
+       "md": "Green"
+      },
+      {
+       "id": "b",
+       "md": "Red"
+      },
+      {
+       "id": "c",
+       "md": "Orange"
+      }
+     ],
+     "answer": [
+      "b"
+     ],
+     "explain": "Red is a primary colour; green and orange are mixed."
+    },
+    {
+     "type": "mcq",
+     "multi": true,
+     "prompt": "Select **all** the even numbers.",
+     "choices": [
+      {
+       "id": "n2",
+       "md": "2"
+      },
+      {
+       "id": "n3",
+       "md": "3"
+      },
+      {
+       "id": "n4",
+       "md": "4"
+      },
+      {
+       "id": "n5",
+       "md": "5"
+      }
+     ],
+     "answer": [
+      "n2",
+      "n4"
+     ],
+     "explain": "2 and 4 are even; 3 and 5 are odd."
+    }
+   ]
+  },
+  {
+   "pageId": "p-sketch",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "## Sketch box (drawing block)\n\nThe daemon ink box auto-attaches over the box below so you can draw in it while the page text stays visible. On the device this is real low-latency ink; in the browser preview the box renders but inking needs the device."
+    },
+    {
+     "type": "drawing",
+     "label": "Sketch here",
+     "height": 320
+    }
+   ]
+  },
+  {
+   "pageId": "p-anim",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "## Animation block\n\nPure web SVG/CSS; on the device native fast-refreshes just this region. Press **Play**. (Remember: active animation and active writing can't run at the same time on the panel.)"
+    },
+    {
+     "type": "animation",
+     "kind": "breath",
+     "caption": "Breathing-lungs animation."
+    }
+   ]
+  },
+  {
+   "pageId": "p-hotspots",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "## Hotspots (labeled diagram)\n\nAn image with tappable numbered markers. Tap a marker to reveal its note in the panel below — reveal is ephemeral (no save). Coords are normalized 0..1 of the image."
+    },
+    {
+     "type": "hotspots",
+     "src": "world-map.png",
+     "alt": "World map",
+     "caption": "Tap a marker to reveal its note.",
+     "spots": [
+      {
+       "x": 0.27,
+       "y": 0.46,
+       "label": "1",
+       "md": "**Marker 1** — the Americas (sample reveal text)."
+      },
+      {
+       "x": 0.52,
+       "y": 0.34,
+       "label": "2",
+       "md": "**Marker 2** — Europe & Africa."
+      },
+      {
+       "x": 0.74,
+       "y": 0.42,
+       "label": "3",
+       "md": "**Marker 3** — Asia & the Pacific."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pageId": "p-callout",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "## Callouts\nFour variants, mono-safe: outline weight + tag, no grey fills."
+    },
+    {
+     "type": "callout",
+     "variant": "note",
+     "title": "Remember",
+     "md": "A **note** callout: the default variant, for asides and context."
+    },
+    {
+     "type": "callout",
+     "variant": "tip",
+     "md": "A *tip* callout uses a dashed outline. Great for study hints:\n- skim first\n- then read deeply"
+    },
+    {
+     "type": "callout",
+     "variant": "warning",
+     "title": "Common mistake",
+     "md": "A **warning** callout gets a heavier outline. Don't confuse velocity with speed."
+    },
+    {
+     "type": "callout",
+     "variant": "quote",
+     "title": "Seneca",
+     "md": "Luck is what happens when preparation meets opportunity."
+    }
+   ]
+  },
+  {
+   "pageId": "p-math",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "## Math\nDisplay equations render offline with KaTeX. Malformed TeX falls back to raw text (dashed box), never lost."
+    },
+    {
+     "type": "math",
+     "tex": "E = mc^2",
+     "caption": "Mass–energy equivalence"
+    },
+    {
+     "type": "math",
+     "tex": "\\int_a^b f(x)\\,dx = F(b) - F(a)",
+     "caption": "Fundamental theorem of calculus"
+    },
+    {
+     "type": "math",
+     "tex": "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}"
+    },
+    {
+     "type": "math",
+     "tex": "\\badcommand{broken",
+     "caption": "(deliberately malformed — shows the raw-TeX fallback)"
+    }
+   ]
+  },
+  {
+   "pageId": "p-flashcard",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "## Flashcards\nTap a card to flip it. The flip is a class swap (partial refresh) and re-flows the page."
+    },
+    {
+     "type": "flashcard",
+     "front": "What is the capital of **Ireland**?",
+     "back": "**Dublin** — on the River Liffey."
+    },
+    {
+     "type": "flashcard",
+     "front": "Newton's second law?",
+     "back": "**F = ma**\n\nForce equals mass times acceleration. The longer back face also tests the flip re-pagination."
+    }
+   ]
+  },
+  {
+   "pageId": "p-checklist",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "## Checklist\nTap a row to check it. **Checked state persists** (saved into the notebook, like MCQ answers) — reload to confirm."
+    },
+    {
+     "type": "checklist",
+     "title": "Exam-day kit",
+     "items": [
+      {
+       "id": "pens",
+       "md": "Two **black** pens"
+      },
+      {
+       "id": "calc",
+       "md": "Calculator (non-programmable)"
+      },
+      {
+       "id": "id",
+       "md": "Student ID card"
+      },
+      {
+       "id": "water",
+       "md": "Water bottle, *label removed*"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pageId": "p-cloze",
+   "template": "blank",
+   "blocks": [
+    {
+     "type": "text",
+     "md": "## Cloze\nTap a blank to reveal the hidden word; tap again to hide it. Reveal is ephemeral (not saved)."
+    },
+    {
+     "type": "cloze",
+     "md": "The capital of France is {{Paris}}, and the capital of Ireland is {{Dublin}}.\n\nWater is made of {{hydrogen}} and {{oxygen}}. At sea level it boils at {{100}} °C."
+    }
+   ]
+  }
+ ]
+}

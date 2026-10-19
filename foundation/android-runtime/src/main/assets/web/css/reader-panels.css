@@ -1,0 +1,168 @@
+/* ReaderPanels bottom-sheet (js/reader-panels.js) + reader bookmark UI (js/reader-bookmarks.js,
+   book-reader.js integration). E-ink rules: pure B/W, hairline borders only (no gray fills, no
+   box-shadow), no animation/transition (sheet is added/removed from the DOM instead), no scrollbars
+   (long lists paginate via ReaderPanels.paginateList — big ~48px+ tap targets). */
+
+.rp-overlay { position: fixed; inset: 0; z-index: 200; background: transparent; }
+
+.rp-sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 65%;
+  background: #fff; color: #000; border-top: 2px solid #000;
+  display: flex; flex-direction: column; box-sizing: border-box;
+  font-family: system-ui, sans-serif; }
+
+.rp-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid #000; }
+.rp-title { font-weight: 800; font-size: 17px; }
+.rp-title { display: flex; align-items: center; gap: 9px; }
+.rp-title-icon { display: flex; }
+.rp-title-icon svg { width: 25px; height: 25px; stroke: currentColor; stroke-width: 2; fill: none; }
+.rp-close { width: 40px; height: 40px; border: 2px solid #000; border-radius: 50%;
+  background: #fff; color: #000; font-size: 17px; line-height: 1; font-family: inherit; }
+.rp-close:active { background: #000; color: #fff; }
+
+.rp-body { flex: 1 1 auto; min-height: 0; box-sizing: border-box;
+  padding: 8px 16px 4px; display: flex; flex-direction: column; overflow: hidden; }
+.rp-loading { flex: 1 1 auto; display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 600; }
+
+.rp-tabrow { flex: 0 0 auto; display: flex; border-top: 1px solid #000; }
+.rp-tab { flex: 1; padding: 14px 6px; font-size: 14px; font-weight: 700;
+  background: #fff; color: #000; border: none; border-right: 1px solid #000; font-family: inherit; }
+.rp-tab:last-child { border-right: none; }
+.rp-tab.sel { background: #000; color: #fff; }
+
+.rp-list { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.rp-rows { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+.rp-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 48px; box-sizing: border-box; padding: 8px 4px; border-bottom: 1px solid #ccc;
+  background: #fff; color: #000; text-align: left; font-size: 15px; font-family: inherit; width: 100%; }
+button.rp-row { border: none; }
+.rp-row:active { background: #000; color: #fff; }
+.rp-row.reader-link-arming { background: #000; color: #fff; }
+.rp-row.sel { font-weight: 800; }
+.rp-row-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-row-page { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-weight: 700; opacity: 0.75; margin-left: 8px; }
+.rp-row-date { font-size: 12px; opacity: 0.6; }
+
+.rp-row[class*="rp-toc-l"] .rp-row-label { padding-left: var(--toc-indent, 0); }
+.rp-toc-toggle { flex: 0 0 32px; width: 32px; min-height: 34px; display: flex;
+  align-items: center; justify-content: center; font-size: 22px; font-weight: 800; }
+.rp-toc-toggle.spacer { visibility: hidden; }
+.rp-toc-l2 .rp-row-label, .rp-row.rp-toc-l2 { font-size: 13px; }
+.rp-toc-l3 .rp-row-label, .rp-row.rp-toc-l3 { font-size: 12px; }
+.rp-toc-l4 .rp-row-label, .rp-toc-l5 .rp-row-label, .rp-toc-l6 .rp-row-label { font-size: 12px; }
+
+.rp-bm-row { padding: 0; }
+.rp-bm-info { flex: 1 1 auto; min-height: 48px; display: flex; flex-direction: column;
+  justify-content: center; gap: 2px; padding: 8px 4px; cursor: pointer; }
+.rp-bm-info:active { background: #000; }
+.rp-bm-info:active .rp-row-label, .rp-bm-info:active .rp-row-date { color: #fff; }
+.rp-bm-del { flex: 0 0 auto; width: 44px; height: 44px; border: 2px solid #000; background: #fff;
+  color: #000; font-size: 16px; font-family: inherit; }
+.rp-bm-del:active { background: #000; color: #fff; }
+
+.rp-empty { flex: 1 1 auto; display: flex; align-items: center; justify-content: center;
+  opacity: 0.55; font-size: 14px; padding: 30px 8px; text-align: center; }
+
+.rp-pager { flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  gap: 22px; padding: 10px 0 6px; margin-top: 4px; border-top: 1px solid #000; }
+.rp-pg-btn { width: 44px; height: 44px; border: 2px solid #000; background: #fff; color: #000;
+  font-size: 18px; font-weight: 800; font-family: inherit; }
+.rp-pg-btn:disabled { opacity: 0.3; }
+.rp-pg-btn:not(:disabled):active { background: #000; color: #fff; }
+.rp-pg-info { min-width: 50px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Picture browser: three-by-two thumbnails in the bottom sheet, two-by-three in the narrower
+   Contents drawer. Images are book content and therefore retain their colour; all chrome stays B/W. */
+.rp-image-browser { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.rp-image-grid {
+  flex: 1 1 auto; min-height: 0; display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.rp-image-card {
+  min-width: 0; min-height: 0; padding: 6px; border: 1px solid #000; background: #fff; color: #000;
+  display: flex; flex-direction: column; gap: 4px; text-align: left; font-family: inherit;
+}
+.rp-image-card:active { background: #000; color: #fff; }
+.rp-image-frame {
+  flex: 1 1 auto; min-height: 54px; width: 100%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; background: #fff;
+}
+.rp-image-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.rp-image-label {
+  flex: 0 0 auto; min-height: 16px; font-size: 12px; line-height: 1.2; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rp-image-ref {
+  flex: 0 0 auto; font-size: 10px; line-height: 1.2; opacity: .7;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rp-image-empty { grid-column: 1 / -1; grid-row: 1 / -1; }
+
+/* ---- book-reader integration: bottom-bar "Contents" button + top-right dog-ear bookmark ---- */
+.bk-botbtns { display: flex; justify-content: center; }
+.bk-contents-btn { padding: 10px 22px; font-weight: 700; }
+
+/* Corner glyph shown only while the current page is bookmarked. Pure CSS triangle (border trick),
+   solid ink black — this is the glyph itself, not a decorative fill. Visibility toggles via inline
+   style.display (block/none) — no transition, per the e-ink no-animation rule. */
+.bk-dogear { position: fixed; top: 0; right: 0; width: 0; height: 0; z-index: 47; pointer-events: none;
+  border-style: solid; border-width: 0 34px 34px 0; border-color: transparent #000 transparent transparent;
+  display: none; }
+
+/* ===================== WP9 Format panel (js/reader-format.js) =====================
+   ONE 'Format' tab inside ReaderPanels (both book-reader.js and epub-reader.js) with two inner
+   sections — Fonts / Spacing — switched by a sub-tab row (.rf-subtabs, styled like .rp-tabrow above).
+   Every control is a stepper row (− value +), never a slider: pure B/W, hairline separators, no
+   animation, ~48px+ tap targets, matching the rest of ReaderPanels. */
+.rf-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.rf-presets { flex: 0 0 auto; padding: 2px 0 10px; border-bottom: 2px solid #000; }
+.rf-presets-label { margin: 0 0 7px 2px; font-size: 14px; font-weight: 800; }
+.rf-preset-buttons { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
+.rf-preset-btn { min-height: 48px; padding: 7px 10px; border: 2px solid #000; border-radius: 8px;
+  background: #fff; color: #000; font: 800 14px/1.15 system-ui, sans-serif; }
+.rf-preset-btn:active { background: #000; color: #fff; }
+.rf-subtabs { flex: 0 0 auto; display: flex; border-bottom: 1px solid #000; margin-bottom: 4px; }
+.rf-subtab { flex: 1; padding: 7px 6px; font-size: 13px; font-weight: 700;
+  background: #fff; color: #000; border: none; border-right: 1px solid #000; font-family: inherit; }
+.rf-subtab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.rf-subtab-icon { font-size: 18px; line-height: 1; }
+.rf-subtab:last-child { border-right: none; }
+.rf-subtab.sel { background: #000; color: #fff; }
+.rf-sectbody { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+
+.rf-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 56px; box-sizing: border-box; padding: 8px 4px; border-bottom: 1px solid #ccc; }
+.rf-row-label { font-size: 15px; font-weight: 600; flex: 1 1 auto; }
+.rf-stepper { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.rf-step-btn { width: 48px; height: 48px; border: 2px solid #000; border-radius: 8px;
+  background: #fff; color: #000; font-size: 22px; font-weight: 800; font-family: inherit; }
+.rf-step-btn:active { background: #000; color: #fff; }
+.rf-step-val { min-width: 56px; text-align: center; font-weight: 700; font-size: 15px;
+  font-variant-numeric: tabular-nums; }
+.rf-toggle { min-width: 64px; height: 44px; border: 2px solid #000; border-radius: 8px;
+  background: #fff; color: #000; font-weight: 700; font-family: inherit; }
+.rf-toggle.on { background: #000; color: #fff; }
+
+/* ===================== WP11 Search panel (js/reader-search.js) =====================
+   One 'Search' tab in all three readers' ReaderPanels tab strip: a text input + Go button, results
+   below via ReaderPanels.paginateList (10/page) — same hairline/no-scroll/big-tap-target rules as
+   the rest of this file. type=search brings up the system keyboard's search-flavoured layout /
+   return key on-device. */
+.rs-wrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.rs-bar { flex: 0 0 auto; display: flex; gap: 8px; padding: 2px 0 12px; }
+.rs-input { flex: 1 1 auto; min-height: 48px; box-sizing: border-box; font-size: 16px;
+  padding: 8px 12px; border: 2px solid #000; border-radius: 8px; background: #fff; color: #000;
+  font-family: inherit; -webkit-appearance: none; appearance: none; }
+.rs-go { padding: 8px 22px; font-weight: 800; border: 2px solid #000; border-radius: 8px;
+  min-height: 48px; background: #fff; color: #000; }
+.rs-go:active { background: #000; color: #fff; }
+.rs-results { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.rs-row { display: block; padding: 10px 6px; }
+.rs-row-info { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.rs-snippet { font-size: 14px; line-height: 1.4; }
+.rs-snippet b { font-weight: 800; text-decoration: underline; }
+.rs-ref { opacity: 0.7; }
+.rs-cap-note { flex: 0 0 auto; text-align: center; font-size: 12px; opacity: 0.6; padding: 6px 0 2px; }

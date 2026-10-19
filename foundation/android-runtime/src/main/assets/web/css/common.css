@@ -1,0 +1,47 @@
+/* Kalamos shared styles. Design language (matches kalamos-ui/redesign/shared/theme.css):
+   WHITE dominant, BLACK ink. Areas separated by BLACK lines/outlines — 1px hairlines for
+   dividers, 2px outlines for interactive containers, 3px only for emphasis. Never grey fills
+   (muted = black at reduced opacity). SELECTED / primary = solid black with white content.
+   One spot colour (magenta) only on the active pen chip; all other chrome stays pure B/W. */
+@font-face{font-family:KalamosBookSerif;src:url('../vendor/katex/fonts/KaTeX_Main-Regular.woff2') format('woff2');font-display:swap}
+@font-face{font-family:KalamosBookSans;src:url('../vendor/katex/fonts/KaTeX_SansSerif-Regular.woff2') format('woff2');font-display:swap}
+@font-face{font-family:KalamosBookMono;src:url('../vendor/katex/fonts/KaTeX_Typewriter-Regular.woff2') format('woff2');font-display:swap}
+:root{
+  --ink:#000; --paper:#fff; --hair:#000; --accent:#e6007e;
+  /* Reading annotations may use colour even though reader chrome stays monochrome. This warm
+     marker palette remains distinct after grayscale conversion without darkening black glyphs. */
+  --reader-highlight:rgba(244,196,48,.58);
+  --reader-highlight-soft:rgba(244,196,48,.36);
+  --reader-highlight-edge:#6b5700;
+  --radius:14px; --radius-sm:10px; --radius-pill:999px;
+  --tap:48px; --pad:20px;
+  --font-ui:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font-serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--paper);font-family:var(--font-ui);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:17px}
+a{color:var(--ink);text-decoration:none}
+button{font-family:inherit;cursor:pointer;touch-action:manipulation;min-height:var(--tap);min-width:var(--tap)}
+.muted{color:#000;opacity:.55}
+.serif{font-family:var(--font-serif)}
+
+/* Buttons: white with a 2px black outline; pressed/selected invert to SOLID BLACK with white
+   content. Rounded 10px; pill/primary/large modifiers mirror the redesign. */
+.btn{font-family:inherit;font-size:17px;font-weight:600;background:var(--paper);border:2px solid var(--ink);padding:10px 20px;color:var(--ink);border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px}
+.btn:active{background:var(--ink);color:var(--paper)}
+.btn.active{background:var(--ink);color:var(--paper)}
+.btn.primary{background:var(--ink);color:var(--paper)}
+.btn.pill{border-radius:var(--radius-pill)}
+.btn.ghost{border-style:dashed}
+.btn.lg{min-height:64px;font-size:19px;padding:12px 34px}
+.btn:disabled{opacity:0.25;pointer-events:none}
+
+input,select{font-family:inherit;font-size:17px;color:var(--ink);background:var(--paper)}
+input[type="text"]{border:2px solid var(--ink);border-radius:var(--radius-sm);padding:10px 14px;min-height:var(--tap)}
+
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:var(--paper);border:2px solid var(--ink);border-radius:var(--radius);padding:24px;min-width:300px;max-width:460px}
+.modal h3{font-size:20px;margin-bottom:14px;font-weight:800}
+.modal p{font-size:17px;margin-bottom:20px;color:var(--ink);line-height:1.45}
+.modal-actions{display:flex;gap:12px;justify-content:flex-end}
+.modal-actions .btn{min-width:80px}

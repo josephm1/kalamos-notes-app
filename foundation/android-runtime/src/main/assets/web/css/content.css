@@ -1,0 +1,691 @@
+/* Interactive-format content layer. Bigme bakes it onto the daemon surface; Standard leaves it in
+   the live WebView beneath the retained ink canvas. No scrolling: page-turn buttons move pages. */
+#content-layer {
+  position: absolute; inset: 0;
+  overflow: hidden;                 /* no scroll — page-turn buttons move pages */
+  box-sizing: border-box;
+  padding: 26px 40px;
+  background: transparent;          /* the white page comes from the ink surface */
+  color: #111;
+  font-family: Georgia, 'Times New Roman', serif;
+  display: none;                    /* shown only for notebooks that have content blocks */
+}
+#content-layer.has-content { display: block; }
+
+.cb { margin: 0 0 16px; }
+
+/* text */
+.cb-text h1 { font-size: 30px; margin: 2px 0 12px; line-height: 1.15; }
+.cb-text h2 { font-size: 23px; margin: 4px 0 9px; }
+.cb-text h3 { font-size: 19px; margin: 4px 0 7px; }
+.cb-text p  { font-size: 18px; line-height: 1.5; margin: 8px 0; }
+.cb-text ul { margin: 6px 0 6px 22px; } .cb-text li { font-size: 18px; line-height: 1.45; }
+.cb-text code { font-family: ui-monospace, monospace; background: #fff; border: 1px solid rgba(0,0,0,.35); padding: 0 4px; border-radius: 3px; }
+
+/* image */
+.cb-figure { text-align: center; margin: 14px 0; }
+.cb-img { max-width: 100%; max-height: 420px; border: 1px solid #000; background: #fff; object-fit: contain; }
+.cb-fit-cover .cb-img { object-fit: cover; } .cb-fit-fill .cb-img { object-fit: fill; }
+.cb-caption { font-size: 14px; color: #333; margin-top: 5px; font-style: italic;
+  font-family: system-ui, sans-serif; line-height: 1.35; }
+
+/* MCQ — static; answered by circling a choice with the pen */
+.cb-mcq { padding: 14px 16px; border: 2px solid #000; border-radius: 12px; background: #fff; }
+.cb-mcq-q { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+.cb-mcq-q .qnum { display: inline-block; min-width: 26px; }
+.cb-choices { display: flex; flex-direction: column; gap: 9px; }
+.cb-choice { font-size: 17px; padding: 9px 14px; border: 2px solid #000; border-radius: 9px;
+  background: #fff; font-family: system-ui, sans-serif; }
+.cb-choice .lett { font-weight: 700; margin-right: 8px; }
+.cb-mcq-hint { font-size: 13px; color: #555; margin-top: 9px; font-family: system-ui, sans-serif; font-style: italic; }
+
+/* drawing — a bounded sketch box; the user draws inside it with the daemon pen (high contrast) */
+.cb-draw-label { font-family: system-ui, sans-serif; font-weight: 700; font-size: 17px; color: #000; margin-bottom: 7px; }
+.cb-draw-box { border: 2.5px solid #000; border-radius: 10px; background: #fff;
+  display: flex; align-items: flex-start; justify-content: flex-end; }
+.cb-draw-box .hint { font-family: system-ui, sans-serif; font-size: 13px; font-weight: 600; color: #000; padding: 6px 10px; }
+
+/* ---- clean sketch mode (no old editor chrome) ---- */
+#editor-view.sketch #menu { display: none; }            /* hide the floating editor menu while sketching */
+#content-layer { padding-bottom: 64px; }                /* leave room for the bottom controls */
+/* inline drawing box (lungs) full page */
+#content-layer.sketch-full:not(.sketch-modal) .cb-draw-box {
+  position: absolute; left: 8px; right: 8px; top: 50px; bottom: 8px; height: auto; }
+
+/* centred, header-less Post-it (sticky note) — overlays the page; the content stays visible behind */
+.sk-wrap { position: absolute; inset: 0 0 58px 0; display: flex; align-items: center; justify-content: center; }
+.sk-note { width: 480px; max-width: 92%; background: #fff; border: 3px solid #000; border-radius: 12px;
+  box-shadow: 0 6px 0 rgba(0,0,0,0.3); padding: 12px; }
+.sk-box { height: 320px; border: 2.5px solid #000; border-radius: 8px; background: #fff; }
+/* sticky note full screen: fill the page, the box fills the note */
+#content-layer.sketch-modal.sketch-full .sk-wrap { inset: 0; }
+#content-layer.sketch-modal.sketch-full .sk-note { position: absolute; inset: 6px; width: auto; max-width: none;
+  box-shadow: none; padding: 6px; }
+#content-layer.sketch-modal.sketch-full .sk-box { height: 100%; box-sizing: border-box; }
+
+/* small mode: Done + Full-page, outside/below the box */
+.sk-controls { position: absolute; left: 0; right: 0; bottom: 12px; display: flex; gap: 14px;
+  justify-content: center; padding: 0 16px; }
+.sk-ctl { font-family: system-ui, sans-serif; font-size: 16px; font-weight: 700; padding: 9px 18px;
+  border: 2.5px solid #000; border-radius: 10px; background: #fff; color: #000; }
+/* full screen: a shrink-to-window button inside the box, bottom-right */
+.sk-shrink { position: absolute; right: 16px; bottom: 16px; z-index: 5; width: 46px; height: 46px;
+  border: 2.5px solid #000; border-radius: 10px; background: #fff; color: #000; font-size: 22px; line-height: 1; }
+
+/* animation — a static framed placeholder in the baked content; motion is a future native pass */
+.cb-anim { text-align: center; margin: 14px 0; }
+.cb-anim-stage { width: 240px; height: 200px; margin: 0 auto; }
+.cb-anim svg { width: 100%; height: 100%; }
+
+/* ============== Book reader (#book-view): reflowable HTML sections, CSS-multicolumn pages ========= */
+#book-view { position: fixed; inset: 0; display: none; flex-direction: column; background: #fff; z-index: 30; }
+/* Buttonless, KOReader-style chrome: the content fills the WHOLE screen; page-turns and menus come from
+   tap zones (see BookReader.wireTapZones). The two bars float OVER the content and slide in only when the
+   top/bottom zone is tapped; a small clock+page sits in the bottom-left gutter as the status-bar stand-in. */
+/* bottom padding reserves a clear band for the fixed bottom-left clock/page readout (was clipping into it);
+   a little top/side breathing room too */
+.bk-content { flex: 1 1 auto; position: relative; overflow: hidden; padding: 16px 24px 24px;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
+/* Wide viewports render a TWO-PAGE SPREAD (book-reader.js _pageGeom, >=820 CSS px): give the open
+   book generous outer margins like a real spread. The e-ink device (674px) is untouched. */
+@media (min-width: 820px) {
+  .bk-content { padding: 26px 44px 34px; }
+}
+
+/* Floating bars: hidden = slid off-screen; .show slides them in. Distinct content (top = nav/title,
+   bottom = progress + table of contents), per the tap-the-top vs tap-the-bottom model. */
+.bk-topbar, .bk-botbar { position: fixed; left: 0; right: 0; z-index: 45; background: #fff;
+  font-family: system-ui, sans-serif; display: flex; box-sizing: border-box;
+  transition: transform 0.18s ease; }
+.bk-topbar { top: 0; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #000;
+  transform: translateY(-110%); }
+.bk-botbar { bottom: 0; flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 16px 14px;
+  border-top: 1px solid #000; transform: translateY(110%); }
+.bk-topbar.show, .bk-botbar.show { transform: translateY(0); }
+.bk-title { font-weight: 800; flex: 1; text-align: center; font-size: 16px; letter-spacing: -0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk-ind { font-size: 13px; color: #000; opacity: 0.55; min-width: 44px; text-align: right; }
+.bk-fontctl { display: flex; gap: 6px; flex: 0 0 auto; }
+.bk-fbtn { padding: 6px 10px; font-weight: 700; min-width: 40px; }
+.bk-botrow { display: flex; align-items: center; gap: 12px; }
+.bk-navlbl { font-size: 14px; font-weight: 700; min-width: 66px; }
+.bk-progress { flex: 1; height: 6px; background: #fff; border: 1.5px solid #000; border-radius: 999px; overflow: hidden; }
+.bk-progress > i { display: block; height: 100%; background: #000; }
+.bk-toc { max-height: 40vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.bk-toc-item { text-align: left; font-size: 15px; padding: 9px 12px; border: 2px solid #000;
+  border-radius: 8px; background: #fff; color: #000; font-family: system-ui, sans-serif;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk-toc-item.cur { background: #000; color: #fff; }
+.bk-toc-item:active { background: #000; color: #fff; }
+/* extracted-TOC hierarchy: chapters (l1) bold, sections (l2) indented + lighter */
+.bk-toc-item.bk-toc-l1 { font-weight: 700; }
+.bk-toc-item.bk-toc-l2 { margin-left: 18px; font-size: 13px; border-color: #999; font-weight: 400; }
+
+/* persistent clock + page (bottom-left). Visual only — pointer-events:none lets taps fall through to the
+   bottom tap-zone underneath. */
+.bk-clock { position: fixed; left: 13px; bottom: 7px; z-index: 38; pointer-events: none;
+  font-family: system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #000; opacity: 0.5; }
+.bk-clock.hidden { display: none; }
+/* the page box is the visible "paper": centred, sized to the page/spread, clips the sliding flow */
+.bk-pagebox { position: relative; height: 100%; margin: 0 auto; overflow: hidden; }
+.bk-flow { height: 100%; column-gap: 40px; column-fill: auto; }
+/* keep figures whole and cap media to one column so nothing spills down the page (proper pagination).
+   max-height stays here (the book's own #bk-flow img rule outranks .bk-flow on other props but sets no
+   max-height) so cropped figures always fit a column; small crops are NOT upscaled (width:auto). */
+.bk-flow figure { break-inside: avoid; page-break-inside: avoid; }
+.bk-flow img { max-height: calc(var(--bk-colh, 80vh) - 64px); max-width: 100%; width: auto; object-fit: contain;
+  -webkit-user-drag: none; }
+/* a heading must never be the last line of a column — keep it with the text it introduces */
+.bk-flow h1, .bk-flow h2, .bk-flow h3, .bk-flow h4 { break-after: avoid; -webkit-column-break-after: avoid; }
+.bk-flow .bk-semantic-start { break-before: column; -webkit-column-break-before: column; }
+.bk-flow figcaption { break-before: avoid; }
+/* trim widows/orphans so paragraphs don't leave a single dangling line across a column break */
+.bk-flow p, .bk-flow li { orphans: 2; widows: 2; }
+.bk-flow blockquote, .bk-flow kal-mcq, .bk-flow .rd-mcq, .bk-flow .rd-draw, .bk-flow .rd-anim { break-inside: avoid; }
+/* typed-block JSON wrappers (blocksToHtml): atomic blocks (image/table/mcq/draw/anim) never split a column */
+.bk-flow .bk-atomic { break-inside: avoid; page-break-inside: avoid; }
+.bk-flow .bk-fig { margin: 0.7em 0; text-align: center; }
+.bk-flow .bk-cap { font-size: 0.82em; color: #444; margin-top: 0.25em; }
+/* table-layout:fixed + overflow-wrap keep a wide OCR table inside the column width (no bleed into the next
+   page column = the "merging" artifact). The table block is NOT .bk-atomic, so a long table flows across
+   columns instead of overflowing a fixed-height column off the bottom of the screen. */
+.bk-flow .bk-tbl { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 0.8em; margin: 0.6em 0; }
+.bk-flow .bk-tbl th, .bk-flow .bk-tbl td { border: 1px solid #000; padding: 4px 6px; text-align: left; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
+/* Sizing box for a table: when the table is too big for the page it is scaled DOWN with a transform and
+   this box is sized to the scaled footprint. overflow:hidden CLIPS the transform's phantom (unscaled)
+   layout box — never a scrollbar (the e-ink panel repaints too slowly to scroll). */
+.bk-flow .bk-tblbox { margin: 0.6em auto; overflow: hidden; }
+.bk-flow .bk-tblbox > .bk-tbl { margin: 0; }
+/* Oversized table rendered at its NATURAL proportions (source column widths), then transform-scaled to
+   fit — reads like a shrunk picture of the table rather than a mangled reflow. */
+.bk-flow .bk-tbl-natural { table-layout: auto; width: auto; }
+.bk-flow .bk-tbl-natural th, .bk-flow .bk-tbl-natural td { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+/* A shrunk table is tap-to-zoom (like an image): pointer cursor + a corner zoom affordance. */
+.bk-flow .bk-tbl-zoom { position: relative; cursor: pointer; }
+.bk-flow .bk-tbl-zoom::after { content: "\2922"; position: absolute; top: 2px; right: 2px;
+  font-size: 15px; line-height: 1; color: #000; background: #fff; border: 1px solid #000;
+  border-radius: 4px; padding: 1px 3px; }
+/* table shown inside the full-screen viewer (outside #bk-flow, so it needs its own borders/type) */
+.iv-node { touch-action: none; transform-origin: center; }
+.iv-node table { border-collapse: collapse; background: #fff; color: #000; font-size: 15px; }
+.iv-node th, .iv-node td { border: 1px solid #000; padding: 5px 8px; text-align: left; vertical-align: top; white-space: nowrap; }
+.bk-flow .bk-pre { white-space: pre-wrap; font-size: 0.85em; }
+/* printed table of contents (blocksToHtml 'contents'): title … dot leader … page number, the whole row
+   tappable when the converter resolved a jump target (data-sec). Generous row padding = a finger/pen
+   target on e-ink; the baseline-aligned dotted rule mimics the printed book's own leader. */
+.bk-flow .bk-contents { margin: 0.4em 0; }
+.bk-flow .bk-toc-row { display: flex; align-items: baseline; padding: 4px 2px; color: inherit;
+  text-decoration: none; font-size: 0.92em; break-inside: avoid; cursor: pointer; }
+.bk-flow .bk-toc-row[data-sec]:active { background: #eee; }
+.bk-flow .bk-toc-row.reader-link-arming { background: #000; color: #fff; }
+.bk-flow .bk-toc-h { font-weight: 700; margin-top: 0.55em; font-size: 0.98em; }
+.bk-flow .bk-toc-t { flex: 0 1 auto; text-align: left; text-indent: 0; }
+.bk-flow .bk-toc-dots { flex: 1 0 14px; border-bottom: 1px dotted #999; margin: 0 6px;
+  transform: translateY(-3px); }
+.bk-flow .bk-toc-pg { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+/* breathing room at an original-page boundary: extra space + a short faint centred rule cues a page turn */
+.bk-flow .bk-newpage { margin-top: 1.9em; }
+.bk-flow .bk-newpage::before { content: ''; display: block; width: 38px; border-top: 1px solid #c2c2c2; margin: 0 auto 1.5em; }
+.bk-flow .bk-associated-next { break-after: avoid-column; -webkit-column-break-after: avoid; }
+/* AI-enriched (gen:"ai") blocks: subtle ⚑ corner marker so nothing AI-made looks like source */
+.bk-flow .bk-gen { position: relative; }
+.bk-flow .bk-gen-flag { position: absolute; top: -2px; right: 0; font-size: 0.7em; opacity: 0.55; pointer-events: none; }
+
+/* ========================= Beautiful book interior typography (bespoke print feel) =================
+   Grayscale e-ink target (1264x1680). Aims for a designed book-page look: justified + hyphenated body,
+   indented paragraphs with no inter-paragraph gap (classic trade-book setting), a real heading hierarchy,
+   chapter drop-caps, pull-quotes and quiet figure captions. Scoped to .bk-flow so Notes is untouched. */
+.bk-flow {
+  font-family: Georgia, 'Noto Serif', 'Times New Roman', serif;
+  font-size: 19px; line-height: 1.5; color: #111;
+  text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
+}
+.bk-flow p {
+  margin: 0; text-align: justify; hyphens: auto; -webkit-hyphens: auto;
+  hanging-punctuation: first last;
+}
+.bk-flow .bk-reconstructed-paragraph { text-indent: 1.3em; }
+.bk-flow .bk-flow-segment { display: inline; }
+.bk-flow .bk-source-anchor { display: none; }
+.bk-flow .bk-source-layout { margin: 0.8em auto; }
+.bk-flow .bk-source-layout img { width: auto; max-width: 100%; }
+/* Indented paragraphs (no leading), but the FIRST paragraph of a section / after any heading, figure,
+   quote, list, table or page-break flushes left. Each source block is wrapped in its own .bk-blk div, so
+   the reset is expressed with :has() across those wrappers (plus the in-block heading+p case). */
+.bk-flow p { text-indent: 1.3em; }
+.bk-flow .bk-blk:first-child > p:first-child,
+.bk-flow .bk-blk.bk-newpage > p:first-child,
+.bk-flow .bk-blk > :is(h1, h2, h3, h4) + p,
+.bk-flow .bk-blk:has(> :is(h1, h2, h3, h4)) + .bk-blk > p:first-child,
+.bk-flow .bk-blk:has(> :is(figure, table, blockquote, .bk-pull, .bk-math, .bk-tbl)) + .bk-blk > p:first-child,
+.bk-flow .bk-atomic + .bk-blk > p:first-child,
+.bk-flow p.bk-open { text-indent: 0; }
+.bk-flow ul, .bk-flow ol { margin: 0.5em 0 0.5em 1.4em; padding: 0; }
+.bk-flow li { margin: 0.12em 0; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
+
+/* Heading hierarchy: chapter title (h1) commands the page; section (h2) is a quiet small-caps lead-in. */
+.bk-flow h1 {
+  font-size: 1.7em; line-height: 1.14; font-weight: 700; text-align: center;
+  margin: 0.3em 0 0.7em; letter-spacing: 0.01em; text-wrap: balance;
+}
+.bk-flow h2 {
+  font-size: 1.12em; line-height: 1.22; font-weight: 700; margin: 1.35em 0 0.35em;
+  letter-spacing: 0.04em; font-variant-caps: small-caps; text-transform: none;
+}
+.bk-flow h3 { font-size: 1em; font-weight: 700; font-style: italic; margin: 1em 0 0.25em; letter-spacing: 0.01em; }
+
+/* Chapter opener: the converter tags the first body block after a chapter title with .bk-open → drop-cap
+   + no indent. Small-caps on the opening words gives the classic book-chapter lead-in. */
+.bk-flow p.bk-open { text-indent: 0; }
+.bk-flow p.bk-open::first-letter {
+  float: left; font-size: 3.1em; line-height: 0.82; font-weight: 700;
+  padding: 0.02em 0.08em 0 0; margin: 0.02em 0.02em 0 0;
+}
+.bk-flow p.bk-open::first-line { font-variant-caps: small-caps; letter-spacing: 0.02em; }
+
+/* Pull-quote: large, centered, hairline rules top & bottom; never splits across a column. */
+.bk-flow .bk-pull {
+  break-inside: avoid; text-align: center; font-size: 1.28em; line-height: 1.3;
+  font-style: italic; margin: 1.2em 0; padding: 0.7em 0.4em; border-top: 1px solid #000; border-bottom: 1px solid #000;
+}
+.bk-flow .bk-pull .bk-pull-cite { display: block; font-size: 0.62em; font-style: normal; font-variant-caps: small-caps; letter-spacing: 0.06em; margin-top: 0.5em; }
+
+/* Figures: quiet, centred, italic serif caption with a hairline. Small inline marks stay small. */
+.bk-flow .bk-fig { margin: 0.9em auto; text-align: center; }
+/* The figure is a full-width centred block; its IMAGE is sized to the source proportion (--figw) and
+   centred, so the caption below is free to set at a readable measure instead of the image's width. */
+.bk-flow .bk-fig img { width: var(--figw, auto); max-width: 100%; height: auto; }
+/* Screen-size adaptation from the preserved OCR `role`: a DATA figure (chart/diagram) must stay legible
+   on the smallest (6") panel — floor it at a readable share of the column even if its source box was
+   small — while a purely decorative mark (role=image) keeps its small source proportion. The floor is
+   %-based, so it scales with the screen and is independent of the reader's font size; tap-to-zoom covers
+   fine detail. data-col (also from bbox) is preserved for a future wide-screen margin-sidebar treatment. */
+.bk-flow .bk-blk[data-role="chart"] .bk-fig img,
+.bk-flow .bk-blk[data-role="diagram"] .bk-fig img { min-width: 45%; }
+@media (max-width: 600px) {   /* 6" panel: give data figures a touch more so labels stay readable */
+  .bk-flow .bk-blk[data-role="chart"] .bk-fig img,
+  .bk-flow .bk-blk[data-role="diagram"] .bk-fig img { min-width: 55%; }
+}
+/* caption: quiet italic serif, but never narrower than a legible measure and never wider than a
+   comfortable one — centred under the image regardless of how small the image is. */
+.bk-flow .bk-cap { font-size: 0.78em; font-style: italic; color: #333; margin-top: 0.35em; line-height: 1.3;
+  max-width: 34ch; margin-left: auto; margin-right: auto; }
+/* source/credit line recovered from an aside: quiet, small, right-aligned; its own block, never a caption */
+.bk-flow .bk-credit { font-size: 0.72em; color: #666; margin: 0.3em 0 0.2em; text-align: right; font-style: italic; }
+.bk-flow .bk-panel .bk-credit { text-align: left; }
+/* Large captioned figure on a WIDE viewport: media left, caption right — uses the margin space a big
+   screen leaves free instead of stacking the caption under the image. The inline width (stacked mode)
+   is overridden to full column; the image keeps its sized share via --figw. Narrow screens unaffected. */
+@media (min-width: 820px) {
+  .bk-flow .bk-fig.bk-fig-row { display: flex; align-items: center; gap: 22px;
+    width: 100% !important; text-align: left; }
+  .bk-flow .bk-fig.bk-fig-row img { width: var(--figw, 62%); min-width: 0; flex: 0 0 auto; }
+  .bk-flow .bk-fig.bk-fig-row .bk-cap { flex: 1 1 auto; margin-top: 0; text-align: left; }
+}
+
+/* Image-near-text: a small figure the OCR linked to explaining text floats beside it (the converter sets
+   `side` on the block). The following text blocks wrap around it. Wide figures stay full-width & stacked. */
+.bk-flow .bk-blk-side { float: left; width: 42%; max-width: 280px; margin: 0.15em 1.1em 0.4em 0; }
+.bk-flow .bk-blk-side .bk-fig { margin: 0; }
+.bk-flow .bk-blk-side .bk-fig img { width: 100%; max-height: calc(var(--bk-colh, 80vh) * 0.42); object-fit: contain; }
+.bk-flow .bk-blk-side .bk-cap { text-align: center; }
+
+/* Occasional metro grid (e.g. Key Concepts): minimal hairline cards, generous white space, small caps
+   label. Fires only where the converter detected a clean provenanced term list. Grayscale e-ink friendly. */
+.bk-flow .bk-gtitle { font-variant-caps: small-caps; letter-spacing: 0.07em; font-weight: 700;
+  font-size: 0.92em; margin: 1.3em 0 0.55em; }
+.bk-flow .bk-grid { display: grid; gap: 9px; margin: 0.2em 0 1.1em; }
+.bk-flow .bk-grid-concepts { grid-template-columns: repeat(2, 1fr); }
+.bk-flow .bk-gcard { border: 1px solid #cfcfcf; border-radius: 7px; padding: 9px 11px;
+  display: flex; flex-direction: column; gap: 2px; break-inside: avoid; }
+.bk-flow .bk-gterm { font-size: 0.92em; line-height: 1.22; }
+.bk-flow .bk-gpage { font-size: 0.7em; color: #8a8a8a; font-variant-caps: small-caps; letter-spacing: 0.05em; }
+
+/* Newspaper column-box: a flat short-item list (maths problem set, short enumeration) set in two columns
+   inside a quiet hairline box. Items never split across a column. */
+.bk-flow .bk-cols { column-count: 2; column-gap: 22px; margin: 0.7em 0 1em; padding: 12px 15px;
+  border: 1px solid #d6d6d6; border-radius: 8px; font-size: 0.92em; }
+.bk-flow .bk-cols-item { break-inside: avoid; margin: 0 0 0.4em; line-height: 1.35; }
+.bk-flow .bk-cols-item:last-child { margin-bottom: 0; }
+
+/* Sidebar panel recovered from the source page's box geometry (e.g. "Ask the Experts", DK "IN CONTEXT").
+   B/W e-ink: NO fill (a grey ground dithers and lowers contrast) — a heavy left rule + top/bottom
+   hairlines make a 3-sided frame that reads as a bounded aside AND survives a column split (default
+   box-decoration-break:slice draws the top/bottom only at the panel's true start/end, not mid-column). */
+.bk-flow .bk-panel { margin: 0.9em 0; padding: 9px 13px;
+  border-left: 3px solid #000; border-top: 1px solid #000; border-bottom: 1px solid #000;
+  background: none; font-size: 0.88em;
+  clear: both; display: flow-root; }   /* never wrap around a neighbouring side-float */
+.bk-flow .bk-panel-title { font-variant-caps: small-caps; letter-spacing: 0.08em; font-weight: 700;
+  font-size: 1.02em; margin: 0 0 0.45em; }
+.bk-flow .bk-panel h1, .bk-flow .bk-panel h2, .bk-flow .bk-panel h3 {   /* nested titles stay quiet */
+  font-size: 1em; text-align: left; font-variant-caps: small-caps; margin: 0.75em 0 0.15em; }
+.bk-flow .bk-panel p { text-indent: 0; margin: 0.3em 0; }
+.bk-flow .bk-panel .bk-blk + .bk-blk > p:first-child { text-indent: 0; }
+
+/* In-context source checkpoint: preserves the casebook's intended cover-answer-read-on rhythm
+   without detouring to a detached workbook page. Everything revealed below the rule is exact book
+   content; only the learner note and reveal state are mutable sidecar data. */
+.bk-flow .bk-checkpoint {
+  display: block; break-inside: avoid; margin: 0.9em 0 1.1em; padding: 0.8em 0.9em;
+  border: 2px solid #111; border-radius: 8px; background: #fff; font-family: Georgia, 'Noto Serif', serif;
+}
+.bk-flow .bk-checkpoint.is-revealed { break-inside: auto; -webkit-column-break-inside: auto;
+  box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.bk-flow .bk-checkpoint-kicker,
+.bk-flow .bk-checkpoint-note-label,
+.bk-flow .bk-checkpoint-answer-label {
+  display: block; font-family: system-ui, sans-serif; font-size: 0.68em; font-weight: 800;
+  letter-spacing: 0.09em; text-transform: uppercase;
+}
+.bk-flow .bk-checkpoint-kicker { margin-bottom: 0.45em; }
+.bk-flow .bk-checkpoint-prompt { font-size: 1.05em; font-weight: 700; line-height: 1.32; }
+.bk-flow .bk-checkpoint-prompt p { margin: 0; text-align: left; text-indent: 0; }
+.bk-flow .bk-checkpoint-note-label { margin: 0.8em 0 0.3em; color: #444; }
+.bk-flow .bk-checkpoint-note {
+  display: block; box-sizing: border-box; width: 100%; min-height: 5.2em; resize: none;
+  padding: 0.55em 0.65em; border: 1.5px solid #333; border-radius: 5px; background: #fff;
+  color: #111; font: 0.82em/1.35 system-ui, sans-serif; touch-action: manipulation;
+}
+.bk-flow .bk-checkpoint-reveal {
+  display: block; width: 100%; min-height: 44px; margin-top: 0.65em; padding: 0.55em 0.7em;
+  border: 2px solid #111; border-radius: 5px; background: #111; color: #fff;
+  font: 700 0.78em/1.2 system-ui, sans-serif; touch-action: manipulation;
+}
+.bk-flow .bk-checkpoint.is-revealed .bk-checkpoint-reveal { background: #fff; color: #111; }
+.bk-flow .bk-checkpoint-answer { margin-top: 0.85em; padding-top: 0.75em; border-top: 1px solid #777; }
+.bk-flow .bk-checkpoint-answer[hidden] { display: none; }
+.bk-flow .bk-checkpoint-answer-label { margin-bottom: 0.55em; }
+.bk-flow .bk-checkpoint-answer .bk-blk p:first-child { text-indent: 0; }
+
+/* Timeline strip (chronology entries recovered from box geometry): icon, small-caps date, short
+   caption per entry, set as a wrapping row between hairlines. Atomic — one strip stays together. */
+.bk-flow .bk-timeline { display: flex; flex-wrap: wrap; gap: 12px; margin: 0.9em 0;
+  padding: 10px 2px; border-top: 1px solid #000; border-bottom: 1px solid #000; }
+.bk-flow .bk-tl-item { flex: 1 1 130px; min-width: 110px; max-width: 240px; font-size: 0.78em; }
+.bk-flow .bk-tl-img { display: block; max-height: 44px; margin: 0 auto 4px; }
+.bk-flow .bk-tl-date { font-weight: 700; font-variant-caps: small-caps; text-align: center;
+  letter-spacing: 0.04em; margin-bottom: 3px; }
+.bk-flow .bk-tl-text { line-height: 1.3; hyphens: auto; }
+.bk-flow .bk-tl-text p { text-indent: 0; margin: 0; }
+
+/* Margin key-term definition, boxed (recovered from vision_footnote/aside_text that used to leak into the
+   body). Bold term, quiet definition, a left rule — a clean magazine margin-note look. */
+.bk-flow .bk-def { break-inside: avoid; margin: 0.7em 0; padding: 6px 12px; border-left: 3px solid #000;
+  background: none; }
+.bk-flow .bk-def-term { display: block; font-weight: 700; font-size: 0.95em; letter-spacing: 0.01em; }
+.bk-flow .bk-def-body { display: block; font-size: 0.86em; line-height: 1.32; color: #333; margin-top: 2px; }
+/* display math: centred block, kept within the column width (wide formulas clip rather than bleed into the
+   next page column — a tap-to-expand viewer for oversized math/tables is the planned fix, see RENDERING_AND_LAYOUT.md) */
+.bk-flow .bk-math { text-align: center; margin: 0.7em 0; max-width: 100%; overflow-x: hidden; }
+.bk-flow .bk-math .katex-display { margin: 0; }
+/* A formula the OCR left malformed (rare, e.g. lost brace structure) can't be typeset; KaTeX then
+   shows the raw source. book-reader.js replaces that source with a readable plain-text reduction
+   (mathFallbackText). Render it quietly in inherited colour (not alarming red); a faint dotted
+   underline marks it as an approximation of an un-typesettable formula. */
+.bk-flow .katex-error { color: inherit !important; }
+.bk-flow .bk-math-degraded { border-bottom: 1px dotted #999; }
+/* inline <kal-ink> box: the daemon draws directly in this outline when its page is reached */
+.bk-ink { position: relative; border: 2.5px solid #000; border-radius: 8px; background: #fff;
+  break-inside: avoid; margin: 6px 0; }
+.bk-ink-hint { position: absolute; right: 10px; top: 8px; font-family: system-ui, sans-serif;
+  font-size: 12px; font-weight: 600; color: #000; }
+
+/* full-screen image viewer (tap an image) with zoom + pan + rotate */
+.iv-overlay { position: fixed; inset: 0; z-index: 70; background: #fff; overflow: hidden; }
+.iv-pan { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.iv-img { max-width: 98vw; max-height: 92vh; object-fit: contain; touch-action: none; transform-origin: center; }
+.iv-img.rot { max-width: 92vh; max-height: 98vw; }
+.iv-bar { position: absolute; bottom: 18px; right: 18px; display: flex; gap: 10px; }
+.iv-btn { min-width: 48px; font-size: 20px; line-height: 1; padding: 9px 12px; }
+
+/* ============== Interactive reading mode (#reader-view, the live WebView layer) ============== */
+#reader-view {
+  position: absolute; inset: 0;
+  display: none; flex-direction: column;
+  background: #fff; color: #111;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+/* Reader chrome floats — no dividing bars; pill buttons; content leads. */
+.rd-bar, .rd-nav {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px;
+  font-family: system-ui, sans-serif; flex: 0 0 auto;
+}
+.rd-nav { justify-content: space-between; }
+.rd-title { font-weight: 800; font-size: 17px; flex: 1; text-align: center; letter-spacing: -0.01em; }
+.rd-pageind { font-size: 13px; color: #000; opacity: 0.55; min-width: 48px; text-align: right; }
+.rd-btn { font-family: system-ui, sans-serif; font-size: 14px; padding: 7px 16px;
+  border: 2px solid #000; border-radius: 999px; background: #fff; color: #000; min-height: 40px; }
+.rd-btn:disabled { opacity: 0.3; }
+.rd-btn:active { background: #000; color: #fff; }
+
+/* the page is a clipped viewport; the flow inside reflows blocks into screen-wide columns (= pages),
+   shown one at a time via translateX (no scroll, no clipping — page-turn moves between columns). */
+.rd-page { flex: 1 1 auto; overflow: hidden; padding: 22px 34px;
+  max-width: 860px; width: 100%; margin: 0 auto; box-sizing: border-box; position: relative; }
+.rd-flow { height: 100%; column-gap: 40px; column-fill: auto; will-change: transform; }
+/* never split a block across a column boundary (that's what caused clipping) */
+.rd-flow > *, .rd-text, .rd-figure, .rd-mcq, .rd-draw, .rd-anim, .rd-hotspots {
+  break-inside: avoid; -webkit-column-break-inside: avoid; }
+/* tall interactive blocks start a fresh column so they get a full page of room — an MCQ keeps room for
+   the explanation it reveals when answered; a drawing/hotspots box gets its own clean page. */
+.rd-mcq, .rd-draw, .rd-hotspots {
+  break-before: column; -webkit-column-break-before: column; }
+
+.rd-text h1 { font-size: 30px; margin: 4px 0 12px; line-height: 1.15; }
+.rd-text h2 { font-size: 23px; margin: 6px 0 9px; }
+.rd-text h3 { font-size: 19px; margin: 6px 0 7px; }
+.rd-text p  { font-size: 18px; line-height: 1.5; margin: 9px 0; }
+.rd-text ul { margin: 6px 0 6px 22px; } .rd-text li { font-size: 18px; line-height: 1.45; }
+.rd-text code { font-family: ui-monospace, monospace; background: #fff; border: 1px solid rgba(0,0,0,.35); padding: 0 4px; border-radius: 3px; }
+
+.rd-figure { text-align: center; margin: 14px 0; }
+.rd-img { max-width: 100%; max-height: 440px; border: 1px solid #000; background: #fff; object-fit: contain; }
+.rd-figure.cb-fit-cover .rd-img { object-fit: cover; }
+.rd-caption { font-size: 14px; color: #333; margin-top: 6px; font-style: italic;
+  font-family: system-ui, sans-serif; line-height: 1.4; }
+.rd-img-missing::before { content: '🖼 image unavailable'; display: block; padding: 28px;
+  border: 1px dashed #999; color: #777; }
+
+.rd-mcq { margin: 18px 0; padding: 16px 18px; border: 2px solid #000; border-radius: 12px; background: #fff; }
+.rd-mcq-q { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+.rd-choices { display: flex; flex-direction: column; gap: 10px; }
+.rd-choice { font-size: 17px; text-align: left; padding: 11px 14px; border: 2px solid #000;
+  border-radius: 9px; background: #fff; font-family: system-ui, sans-serif; }
+.rd-choice.sel { background: #000; color: #fff; }
+.rd-choice.correct { border-color: #128a18; box-shadow: inset 0 0 0 2px #128a18; }
+.rd-choice.correct::after { content: '  ✓'; color: #128a18; font-weight: 700; }
+.rd-choice.wrong { border-color: #b00; box-shadow: inset 0 0 0 2px #b00; }
+.rd-choice.wrong::after { content: '  ✗'; color: #b00; font-weight: 700; }
+.rd-mcq-foot { margin-top: 14px; }
+.rd-explain { display: none; margin-top: 12px; font-size: 16px; line-height: 1.5;
+  padding: 10px 12px; border-left: 4px solid #000; background: #fff; }
+.rd-explain.show { display: block; }
+
+/* the page is the selection surface for the inverted-pen highlighter (no scroll-hijack); disable the
+   browser's own text selection + its copy/select/share callout — we render our own selection */
+.rd-page { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* overlay layers for selection + persisted highlights (fixed = viewport coords from getClientRects) */
+.rd-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+/* Persistent highlight: warm marker-yellow stays readable on colour LCD/OLED and becomes a clear
+   light-gray band on monochrome e-ink. The darker edge survives panels with few gray levels. */
+.rd-hl-rect { position: fixed; background: var(--reader-highlight); border-radius: 1px;
+  mix-blend-mode: multiply; }
+.rd-hl-box  { position: fixed; border: 1px solid var(--reader-highlight-edge); border-radius: 3px; }
+/* live selection while dragging the inverted pen (slightly lighter) */
+.rd-sel-rect { position: fixed; background: var(--reader-highlight-soft); mix-blend-mode: multiply; }
+.rd-sel-box  { position: fixed; border: 1px dashed var(--reader-highlight-edge); border-radius: 3px; }
+/* tiny pencil-glyph marker that a highlight has a sticky note (clickable to reopen/edit). Small, not
+   a filled box; the highlight stays fully highlighted underneath. */
+.rd-note-icon { position: fixed; pointer-events: auto; width: 10px; height: 10px; padding: 0; margin: 0;
+  background: transparent; border: none; line-height: 0; }
+.rd-note-icon svg { width: 10px; height: 10px; display: block; }
+/* WP11: transient search-jump locator (BookReader.applyHighlights/EpubReader._applySearchMark, both
+   via reader-controller.js's drawRangeInto/rangeForOffsets). No fill (unlike the persisted yellow
+   highlight above) — it's a one-shot locator, not user data, and is gone the moment the page turns:
+   a black underline per line + a dashed outline box. */
+.rd-search-hit-rect { position: fixed; border-bottom: 3px solid #000; }
+.rd-search-hit-box  { position: fixed; border: 1.5px dashed #000; border-radius: 3px; }
+
+/* selection popup (Highlight / Sticky note / close) */
+.rd-pop { position: absolute; z-index: 50; display: flex; gap: 0;
+  border: 2px solid #000; border-radius: 10px; overflow: hidden; background: #fff;
+  box-shadow: 0 2px 0 #000; font-family: system-ui, sans-serif; }
+.rd-pop-btn { font-size: 15px; padding: 9px 14px; background: #fff; border: none; border-right: 2px solid #000; }
+.rd-pop-btn:last-child { border-right: none; }
+.rd-pop-btn:active { background: #000; color: #fff; }
+.rd-pop-btn.reader-link-arming { background: #000; color: #fff; }
+
+/* sticky-note overlay: a centred Post-it; the page + highlight stay visible behind it. The .rd-note-box
+   reserves the drawing area — the daemon ink surface is resized to cover exactly that box (partial
+   refresh). Default small; .full fills the screen. */
+.rd-note-wrap { position: fixed; inset: 0; z-index: 55; display: flex; align-items: center; justify-content: center; }
+.rd-note-card { display: flex; flex-direction: column; width: 480px; max-width: 92%; background: #fff;
+  border: 3px solid #000; border-radius: 12px; box-shadow: 0 6px 0 rgba(0,0,0,0.3); padding: 12px; }
+.rd-note-card.full { position: absolute; inset: 6px; width: auto; max-width: none; box-shadow: none; }
+.rd-note-box { height: 320px; border: 2px solid #000; border-radius: 8px; background: #fff; }
+.rd-note-card.full .rd-note-box { flex: 1 1 auto; height: auto; }
+.rd-note-ctl { margin-top: 10px; display: flex; gap: 14px; justify-content: center; flex: 0 0 auto; }
+
+.rd-draw { margin: 18px 0; }
+.rd-draw-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+.rd-draw-btn { padding: 6px 14px; font-size: 14px; }
+.rd-draw-label { font-family: system-ui, sans-serif; font-weight: 700; font-size: 16px; }
+.rd-draw-box { border: 2px dashed #000; border-radius: 10px; background: #fff;
+  display: flex; align-items: flex-start; justify-content: flex-end; }
+.rd-draw-box .hint { font-family: system-ui, sans-serif; font-size: 13px; font-weight: 600; color: #000; padding: 6px 10px; }
+
+.rd-anim { text-align: center; margin: 16px 0; }
+.rd-anim-stage { width: 240px; height: 200px; margin: 0 auto; }
+.rd-anim-stage svg { width: 100%; height: 100%; }
+.rd-anim-ctrl { margin-top: 8px; }
+.rd-anim-stage .lung { transform-origin: 120px 130px; }
+.rd-anim-stage.playing path:nth-of-type(3) { animation: breathe-l 3.4s ease-in-out infinite; transform-origin: 78px 130px; }
+.rd-anim-stage.playing path:nth-of-type(4) { animation: breathe-r 3.4s ease-in-out infinite; transform-origin: 162px 130px; }
+@keyframes breathe-l { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.08,1.12); } }
+@keyframes breathe-r { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.08,1.12); } }
+
+/* hotspots: labeled diagram (image + tappable markers + reveal panel). Mono-safe: black/white markers,
+   active inverts. Tap-driven (e-ink partial refresh), no animation. */
+.rd-hotspots { margin: 16px 0; text-align: center; }
+.rd-hs-fig { margin: 0; }
+.rd-hs-imgwrap { position: relative; display: inline-block; max-width: 100%; }
+.rd-hs-img { display: block; max-width: 100%; height: auto; }
+.rd-hs-imgwrap.rd-hs-missing { min-width: 200px; min-height: 120px; border: 2px dashed #999; }
+.rd-hs-markers { position: absolute; inset: 0; pointer-events: none; }
+.rd-hs-marker { position: absolute; transform: translate(-50%, -50%); pointer-events: auto;
+  min-width: 30px; height: 30px; padding: 0 6px; border: 2px solid #000; border-radius: 999px;
+  background: #fff; color: #000; font-family: system-ui, sans-serif; font-weight: 700; font-size: 15px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.rd-hs-marker.active { background: #000; color: #fff; }
+.rd-hs-panel { margin: 10px auto 0; max-width: 90%; text-align: left; border: 2px solid #000;
+  border-radius: 8px; background: #fff; padding: 10px 12px; min-height: 1.6em; }
+.rd-hs-panel .rd-hs-hint { color: #555; font-style: italic; }
+
+/* Pin the Tail: tap an image to drop a pin, Check validates against an invisible target region */
+.rd-pintail { margin: 0.8em 0; text-align: center; }
+.rd-pt-prompt { font-weight: 700; margin-bottom: 8px; }
+.rd-pt-fig { margin: 0; }
+.rd-pt-imgwrap { position: relative; display: inline-block; max-width: 100%; cursor: crosshair; }
+.rd-pt-img { display: block; max-width: 100%; height: auto; }
+.rd-pt-imgwrap.rd-pt-missing { min-width: 200px; min-height: 120px; border: 2px dashed #999; }
+.rd-pt-layer { position: absolute; inset: 0; pointer-events: none; }
+.rd-pt-target { position: absolute; box-sizing: border-box; border: 3px solid #000; border-radius: 4px; display: none; }
+.rd-pt-target.show { display: block; }
+.rd-pintail.wrong .rd-pt-target { border-style: dashed; }
+/* the dropped pin: a clear B/W ring-with-dot, centred on the tap point */
+.rd-pt-pin { position: absolute; width: 18px; height: 18px; box-sizing: border-box; transform: translate(-50%, -50%);
+  border: 3px solid #000; border-radius: 50%; background: #fff; display: none; }
+.rd-pt-pin::after { content: ''; position: absolute; inset: 4px; background: #000; border-radius: 50%; }
+.rd-pt-pin.show { display: block; }
+.rd-pt-foot { margin-top: 10px; }
+
+/* Callout: note/tip/warning/quote box. Mono-safe: variants read by outline weight + inverted tag,
+   never grey fills (e-ink). Quote drops the tag for a heavy left bar + serif body. */
+.rd-callout { margin: 16px 0; padding: 12px 16px; border: 2px solid #000; border-radius: 12px;
+  background: #fff; font-family: system-ui, sans-serif; }
+.rd-co-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.rd-co-tag { display: inline-block; padding: 2px 9px; border-radius: 999px; background: #000; color: #fff;
+  font-size: 11px; font-weight: 800; letter-spacing: .1em; }
+.rd-co-title { font-weight: 700; font-size: 16px; }
+.rd-co-body p { font-size: 16.5px; line-height: 1.45; margin: 5px 0; }
+.rd-co-body ul { margin: 5px 0 5px 20px; } .rd-co-body li { font-size: 16.5px; line-height: 1.4; }
+.rd-co-warning { border-width: 3px; }
+.rd-co-warning .rd-co-tag { border-radius: 4px; }
+.rd-co-tip { border-style: dashed; }
+.rd-co-quote { border: 0; border-left: 4px solid #000; border-radius: 0; padding: 4px 16px 4px 18px; }
+.rd-co-quote .rd-co-body p { font-family: Georgia, 'Times New Roman', serif; font-size: 18px;
+  font-style: italic; line-height: 1.5; }
+.rd-co-cite { margin-top: 6px; font-size: 14px; color: #333; text-align: right; }
+
+/* Display math (KaTeX, bundled offline). Fallback = raw TeX in mono so content is never lost. */
+.rd-math { margin: 16px 0; text-align: center; }
+.rd-math-eq { font-size: 20px; }
+.rd-math-eq.rd-math-raw { font-family: ui-monospace, monospace; font-size: 15px; padding: 10px 12px;
+  border: 1px dashed #999; display: inline-block; text-align: left; white-space: pre-wrap; }
+
+/* Flashcard: tap-to-flip study card. Flip = class swap (partial refresh, no motion). The flipped
+   (back) face inverts the corner tag so front/back scan apart in pure B/W. */
+.rd-flash { margin: 16px 0; text-align: center; }
+.rd-flash-card { position: relative; display: block; width: 100%; min-height: 140px; padding: 30px 22px 34px;
+  border: 2px solid #000; border-radius: 14px; background: #fff; color: #000; box-sizing: border-box;
+  font-family: system-ui, sans-serif; text-align: center; cursor: pointer; }
+.rd-flash-card.flipped { border-width: 3px; }
+.rd-flash-tag { position: absolute; top: 10px; left: 12px; padding: 1px 8px; border: 1.5px solid #000;
+  border-radius: 999px; background: #fff; color: #000; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.rd-flash-card.flipped .rd-flash-tag { background: #000; color: #fff; }
+.rd-flash-body p { font-size: 19px; line-height: 1.45; margin: 4px 0; }
+.rd-flash-hint { position: absolute; bottom: 8px; right: 14px; font-size: 12px; color: #555; font-style: italic; }
+/* editor bake: both faces stacked (the inked page can't tap) */
+.rd-flash-static { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.rd-flash-static .rd-flash-face { position: relative; border: 2px solid #000; border-radius: 14px;
+  padding: 26px 18px 14px; background: #fff; }
+.rd-flash-static .rd-flash-tag { top: -9px; left: 14px; }
+
+/* Checklist: tappable rows with persistent checked state. Mono-safe: empty square ↔ solid black
+   square with a white check; done text strikes through. Rows are full-width buttons (pen-friendly). */
+.rd-checklist { margin: 16px 0; font-family: system-ui, sans-serif; }
+.rd-cl-title { font-weight: 800; font-size: 17px; margin-bottom: 8px; }
+.rd-cl-row { display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left;
+  padding: 10px 12px; margin: 6px 0; border: 2px solid #000; border-radius: 10px; background: #fff;
+  color: #000; font: inherit; cursor: pointer; box-sizing: border-box; }
+.rd-cl-box { flex: 0 0 auto; width: 22px; height: 22px; margin-top: 1px; border: 2.5px solid #000;
+  border-radius: 5px; background: #fff; position: relative; box-sizing: border-box; }
+.rd-cl-row.done .rd-cl-box { background: #000; }
+.rd-cl-row.done .rd-cl-box::after { content: ''; position: absolute; left: 5px; top: 1px; width: 6px;
+  height: 11px; border: solid #fff; border-width: 0 3px 3px 0; transform: rotate(45deg); }
+.rd-cl-text { font-size: 17px; line-height: 1.4; }
+.rd-cl-row.done .rd-cl-text { text-decoration: line-through; }
+
+/* Cloze: {{blank}} spans render as outlined empty slots sized to the hidden word; tap reveals
+   (tap again re-hides). Reveal = visibility swap (partial refresh, no motion). */
+.rd-cloze { margin: 14px 0; }
+.rd-cloze p { font-size: 18px; line-height: 1.7; margin: 9px 0; }
+.rd-cloze ul { margin: 6px 0 6px 22px; } .rd-cloze li { font-size: 18px; line-height: 1.6; }
+.rd-cz-blank { display: inline-block; vertical-align: baseline; margin: 0 2px; padding: 0 8px;
+  border: 0; border-bottom: 2.5px solid #000; border-radius: 0; background: #fff; color: #000;
+  font: inherit; line-height: 1.35; cursor: pointer; text-align: center; box-sizing: content-box; }
+.rd-cz-blank .rd-cz-ans { visibility: hidden; }
+.rd-cz-blank.revealed .rd-cz-ans { visibility: visible; font-weight: 700; }
+
+/* Kalamos-native pages spliced into PDF/EPUB sequences. The immutable source reader stays mounted
+   beneath this paper; turning past the insertion removes it and resumes the source page immediately. */
+.kp-native-page {
+  position: fixed; inset: 0 0 28px; z-index: 38; background: #fff; color: #000;
+  display: flex; flex-direction: column; box-sizing: border-box; font-family: system-ui, sans-serif;
+}
+.kp-native-head {
+  flex: 0 0 auto; min-height: 52px; padding: 6px 14px; border-bottom: 1px solid #000;
+  display: flex; align-items: center; gap: 12px; box-sizing: border-box;
+}
+.kp-native-kind { font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.kp-native-title { flex: 1 1 auto; font-size: 16px; font-weight: 700; }
+.kp-native-btn {
+  min-height: 40px; padding: 6px 12px; border: 1.5px solid #000; border-radius: 8px;
+  background: #fff; color: #000; font: 700 13px system-ui, sans-serif;
+}
+.kp-native-paper {
+  position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 28px 44px; box-sizing: border-box;
+  background: repeating-linear-gradient(#fff 0, #fff 38px, #d7d7d7 39px, #fff 40px);
+}
+.kp-native-page.kp-interactive-page .kp-native-paper { background: #fff; }
+.kp-native-ink { position: absolute; inset: 28px 44px; z-index: 2; touch-action: none; }
+.kp-native-content { position: relative; z-index: 1; height: 100%; overflow: hidden; pointer-events: none; }
+.kp-native-content.has-content {
+  background: #fff; padding: 12px 16px; box-sizing: border-box;
+}
+.kp-source-return {
+  position: fixed; z-index: 190; top: 18px; left: 18px; min-height: 48px;
+  padding: 9px 16px; border: 2px solid #000; border-radius: 8px;
+  background: #fff; color: #000; font: 800 15px system-ui, sans-serif;
+}
+.kp-quiz-row-copy { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
+.kp-quiz-row-source { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.kp-quiz-row-count { flex: 0 0 auto; font-size: 12px; font-weight: 800; }
+
+/* ===================== WP9 Format panel (js/reader-format.js) =====================
+   BookReader.applyFormat() sets --rf-* custom properties on .bk-content (the flow's containing block)
+   from ReaderFormat.cssVars(); every consumer below falls back to the ORIGINAL hardcoded value when a
+   var is unset, so a page with no Format-panel changes made renders pixel-identical to before WP9.
+   Appended (not interleaved) so these rules win the cascade for the specific longhand properties they
+   set, without disturbing the shorthand/other values declared earlier in this file. */
+.bk-flow {
+  font-family: var(--rf-font-family, Georgia, 'Noto Serif', 'Times New Roman', serif);
+  line-height: var(--rf-line-h, 1.5);
+  /* embolden (0|1|2): a pure-black stroke widens strokes on e-ink without a bold font file; 0 = 0px = no-op */
+  -webkit-text-stroke: var(--rf-stroke, 0px) #000;
+}
+.bk-flow p { margin-bottom: var(--rf-para-gap, 0em); word-spacing: var(--rf-word-gap, normal);
+  text-align: var(--rf-align, inherit); hyphens: var(--rf-hyphens, auto); }
+.bk-content.rf-indent-custom .bk-flow p { text-indent: var(--rf-indent, 0) !important; }
+/* margins: extra left/right padding on top of the base rhythm (percentage so it self-adjusts on resize,
+   same as the base padding it's layered onto); ReaderPaginate reads clientWidth minus this padding, so
+   widening it narrows the column with no other JS change needed. */
+.bk-content { padding-left: calc(24px + var(--rf-margin, 0%)); padding-right: calc(24px + var(--rf-margin, 0%));
+  padding-top: calc(16px + var(--rf-margin-v, 0%)); padding-bottom: calc(24px + var(--rf-margin-v, 0%)); }
+@media (min-width: 820px) {
+  .bk-content { padding-left: calc(44px + var(--rf-margin, 0%)); padding-right: calc(44px + var(--rf-margin, 0%)); }
+}
+.rd-pt-fb { margin-top: 6px; min-height: 1.4em; }

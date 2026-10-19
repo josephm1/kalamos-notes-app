@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "templates": [
+    {
+      "id": "mcq-basic",
+      "version": 1,
+      "status": "active",
+      "path": "mcq-basic/v1"
+    }
+  ]
+}

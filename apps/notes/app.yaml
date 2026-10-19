@@ -1,0 +1,16 @@
+schema: kalamos.app/v1
+id: notes
+applicationId: com.kalamos.notebook
+title: Kalamos Notes
+shell: webview-hybrid
+features:
+  - id: kalamos.library
+  - id: kalamos.handwriting
+    host: classic-notebook
+  - id: kalamos.writing
+    host: planning
+device:
+  active: bigme
+  planned: [standard, boox]
+data:
+  compatibility: notes-v1

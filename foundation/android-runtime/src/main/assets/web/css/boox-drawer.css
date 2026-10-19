@@ -1,0 +1,253 @@
+/* Boox UI — Contents-drawer tabs (Annotations / Handwriting) + shared panel bits. Scoped under
+   body.boox; e-ink safe (pure B/W, hairlines, no grey fills / animation / scrollbars). */
+
+/* empty-state message shared by the Annotations / Handwriting tabs */
+body.boox .bx-empty-panel {
+  padding: 40px 24px; text-align: center; font-size: 16px; line-height: 1.5;
+  white-space: pre-line; opacity: .75;
+}
+
+/* Side Contents drawer: the live page stays visible at the right, as in the reference reader. */
+body.boox .bx-drawer-overlay { position: fixed; inset: 0; z-index: 205; display: flex; }
+body.boox .bx-drawer {
+  width: min(74vw, 920px); height: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; background: #fff; border-right: 2px solid #000;
+  font-family: system-ui, sans-serif;
+}
+body.boox .bx-drawer-dismiss { flex: 1; height: 100%; background: transparent; }
+body.boox .bx-drawer-body {
+  flex: 1 1 auto; min-height: 0; padding: 14px 18px 6px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+body.boox .bx-drawer-body .rp-rows { overflow: hidden; }
+body.boox .bx-drawer-body .rp-row {
+  flex: 1 1 0; min-height: 48px; max-height: 58px; touch-action: manipulation;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+body.boox .bx-drawer-body .rp-image-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+}
+body.boox .bx-drawer-tabs { flex: 0 0 auto; display: flex; border-top: 2px solid #000; }
+body.boox .bx-drawer-tab {
+  flex: 1; min-width: 0; min-height: 74px; padding: 7px 3px 5px; border: 0; background: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  color: #000; font-family: inherit;
+}
+body.boox .bx-drawer-tab span { font-size: 27px; line-height: 1; }
+body.boox .bx-drawer-tab span { display: flex; }
+body.boox .bx-drawer-tab span svg { width: 27px; height: 27px; stroke: currentColor; stroke-width: 2; fill: none; }
+body.boox .bx-drawer-tab small { font-size: 11px; font-weight: 700; white-space: nowrap; }
+body.boox .bx-drawer-tab.sel { border-top: 4px solid #000; padding-top: 3px; }
+@media (max-width: 520px) {
+  body.boox .bx-drawer { width: 82vw; }
+  body.boox .bx-drawer-body { padding-left: 10px; padding-right: 10px; }
+  body.boox .bx-drawer-tab small { font-size: 9px; }
+}
+
+/* annotation rows (highlight quote + section/note meta) */
+body.boox .bx-annot-row {
+  padding: 14px 18px; border-bottom: var(--bx-hair); cursor: pointer; min-height: var(--bx-tap);
+}
+body.boox .bx-annot-quote { font-size: 17px; font-weight: 600; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+body.boox .bx-annot-meta { font-size: 14px; opacity: .7; margin-top: 6px; }
+
+/* handwriting rows (note glyph + section) */
+body.boox .bx-hand-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px; border-bottom: var(--bx-hair); cursor: pointer; min-height: var(--bx-tap);
+}
+body.boox .bx-hand-preview {
+  width: 86px; height: 58px; flex: 0 0 auto; overflow: hidden;
+  border: 1px solid #000; background: #fff;
+}
+body.boox .bx-hand-preview svg { display: block; width: 100%; height: 100%; }
+body.boox .bx-hand-copy { min-width: 0; flex: 1 1 auto; }
+body.boox .bx-hand-label { font-size: 16px; font-weight: 600; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+body.boox .bx-hand-meta { margin-top: 5px; font-size: 13px; opacity: .7; }
+
+/* segmented control (reading order etc.) */
+body.boox .bx-seg-row { display: flex; flex-wrap: wrap; gap: 10px; padding: 6px 18px 14px; }
+body.boox .bx-seg {
+  min-width: 46px; min-height: 40px; padding: 0 14px; border: var(--bx-line); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+}
+body.boox .bx-seg.on { background: var(--bx-ink); color: var(--bx-paper); }
+
+/* ---- Visual Navigation crop editor (live page + draggable crop + numbered traversal grid) ---- */
+body.boox .rp-sheet.bx-nav-sheet { height: 62%; }
+body.boox .rp-sheet.bx-nav-sheet .rp-head { padding-top: 8px; padding-bottom: 8px; }
+body.boox .rp-sheet.bx-nav-sheet .rp-tabrow { display: none; }
+body.boox .rp-sheet.bx-nav-sheet .rp-body { padding: 4px 14px 8px; }
+body.boox .bx-nav-editor { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+body.boox .bx-nav-reading { flex: 0 0 auto; display: flex; align-items: center; gap: 12px;
+  padding: 8px 4px 10px; border-bottom: 2px solid #000; }
+body.boox .bx-nav-reading-copy { flex: 1 1 auto; min-width: 0; }
+body.boox .bx-nav-reading-title { font-size: 15px; font-weight: 800; }
+body.boox .bx-nav-reading-note { margin-top: 2px; font-size: 12px; line-height: 1.25; }
+body.boox .bx-nav-reading-btn { flex: 0 0 auto; min-width: 126px; min-height: 48px; padding: 6px 10px;
+  border: 2px solid #000; border-radius: 8px; background: #fff; color: #000; font-weight: 800; }
+body.boox .bx-nav-reading-btn.on { background: #000; color: #fff; }
+body.boox .bx-nav-reading-btn:disabled { border-style: dashed; }
+body.boox .bx-nav-reading-actions { flex: 0 0 auto; display: flex; gap: 4px; }
+body.boox .bx-nav-reading-actions .bx-nav-reading-btn { min-width: 76px; min-height: 44px; padding: 5px 7px; }
+body.boox .bx-nav-stage {
+  flex: 1 1 auto; min-height: 150px; padding: 6px 18px;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; background: #aaa;
+  touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+body.boox .bx-nav-frame {
+  position: relative; display: inline-block; max-width: 84%; max-height: 100%;
+  border: var(--bx-line); overflow: hidden; background: var(--bx-paper);
+  contain: layout paint style; touch-action: none; -webkit-user-select: none; user-select: none;
+}
+body.boox .bx-nav-frame.bx-nav-noimg { width: 168px; height: 216px; }
+body.boox .bx-nav-img {
+  display: block; height: min(31vh, 360px); width: auto; max-width: 100%; object-fit: contain;
+  pointer-events: none; -webkit-user-drag: none; user-select: none;
+}
+body.boox .bx-nav-cropbox {
+  position: absolute; z-index: 2; box-sizing: border-box;
+  border: 3px solid #000; box-shadow: 0 0 0 1000px rgba(0,0,0,.34);
+  touch-action: none; will-change: transform, width, height;
+}
+body.boox .bx-nav-cropbox.dragging { pointer-events: auto; }
+body.boox .bx-nav-handle {
+  position: absolute; z-index: 4; background: #000;
+  touch-action: none; -webkit-user-select: none; user-select: none;
+}
+body.boox .bx-nav-h-l, body.boox .bx-nav-h-r {
+  width: 10px; height: 52px; top: 50%; transform: translateY(-50%); cursor: ew-resize;
+}
+body.boox .bx-nav-h-l { left: -6px; } body.boox .bx-nav-h-r { right: -6px; }
+body.boox .bx-nav-h-t, body.boox .bx-nav-h-b {
+  width: 52px; height: 10px; left: 50%; transform: translateX(-50%); cursor: ns-resize;
+}
+body.boox .bx-nav-h-t { top: -6px; } body.boox .bx-nav-h-b { bottom: -6px; }
+body.boox .bx-nav-h-lt, body.boox .bx-nav-h-rt,
+body.boox .bx-nav-h-lb, body.boox .bx-nav-h-rb {
+  width: 24px; height: 24px; background: #fff; border-style: solid; border-color: #000;
+}
+body.boox .bx-nav-h-lt { left: -5px; top: -5px; border-width: 7px 0 0 7px; cursor: nwse-resize; }
+body.boox .bx-nav-h-rt { right: -5px; top: -5px; border-width: 7px 7px 0 0; cursor: nesw-resize; }
+body.boox .bx-nav-h-lb { left: -5px; bottom: -5px; border-width: 0 0 7px 7px; cursor: nesw-resize; }
+body.boox .bx-nav-h-rb { right: -5px; bottom: -5px; border-width: 0 7px 7px 0; cursor: nwse-resize; }
+body.boox .bx-nav-actions { display: flex; gap: 16px; justify-content: center; padding: 10px 18px; }
+body.boox .bx-nav-action {
+  flex: 1 1 0; max-width: 250px; min-height: 48px; border: var(--bx-line); border-radius: 12px;
+  background: #fff; color: #000; font-size: 16px; font-weight: 700;
+}
+body.boox .bx-nav-action.primary { background: #000; color: #fff; }
+
+/* modes row + margins sub-view */
+body.boox .bx-nav-modes { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 18px; border-top: var(--bx-hair); }
+body.boox .bx-nav-mode {
+  min-height: 42px; padding: 0 16px; border: var(--bx-line); border-radius: 12px;
+  background: var(--bx-paper); color: var(--bx-ink); font-size: 15px; font-weight: 600; cursor: pointer;
+}
+body.boox .bx-nav-mode.bx-soon { opacity: .4; }
+body.boox .bx-nav-back {
+  margin: 12px 18px 0; padding: 8px 14px; border: var(--bx-line); border-radius: 12px;
+  background: var(--bx-paper); color: var(--bx-ink); font-size: 15px; font-weight: 700; cursor: pointer;
+}
+body.boox .bx-nav-grid { position: absolute; inset: 0; pointer-events: none; }
+body.boox .bx-nav-vline { position: absolute; top: 0; bottom: 0; width: 0;
+  border-left: 2px dashed var(--bx-ink); }
+body.boox .bx-nav-hline { position: absolute; left: 0; right: 0; height: 0;
+  border-top: 2px dashed var(--bx-ink); }
+body.boox .bx-nav-num {
+  position: absolute; transform: translate(-50%, -50%);
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid var(--bx-ink); background: var(--bx-paper);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700;
+}
+body.boox .bx-nav-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 18px; border-top: var(--bx-hair); min-height: var(--bx-tap);
+}
+body.boox .bx-nav-rlabel { width: 92px; flex: 0 0 auto; font-size: 16px; font-weight: 600; }
+body.boox .bx-nav-opts { display: flex; flex-wrap: wrap; gap: 10px; }
+body.boox .bx-nav-opt {
+  width: var(--bx-tap); height: var(--bx-tap); flex: 0 0 auto;
+  border: var(--bx-line); border-radius: 12px; background: var(--bx-paper); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: var(--bx-ink);
+}
+body.boox .bx-nav-opt.on { background: var(--bx-ink); color: var(--bx-paper); }
+body.boox .bx-nav-opt svg { width: 26px; height: 26px; stroke: currentColor; stroke-width: 2; fill: none; }
+body.boox .bx-nav-divider { height: 0; border-top: var(--bx-line); margin: 6px 0; }
+body.boox .bx-nav-more { padding-top: 4px; }
+
+/* ---- PDF coordinate annotations (highlight rects + note markers over the page image) ---- */
+body.boox .bx-pdf-ann { position: absolute; z-index: 7; }
+body.boox .bx-pdf-ann.on { touch-action: none; }
+body.boox .bx-pdf-highlight-layer {
+  position: absolute; z-index: 5; pointer-events: none; mix-blend-mode: multiply;
+}
+body.boox .bx-pdf-hl-block {
+  position: absolute; box-sizing: border-box; background: var(--reader-highlight);
+  outline: 1px solid var(--reader-highlight-edge);
+}
+body.boox .bx-pdf-hl-block.no-text { background: var(--reader-highlight-soft); }
+body.boox .bx-pdf-hl-shape { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+body.boox .bx-pdf-hl-shape path { fill:var(--reader-highlight); stroke:var(--reader-highlight-edge); stroke-width:1; vector-effect:non-scaling-stroke; stroke-linejoin:round; }
+body.boox .bx-pdf-hl-shape.no-text path { fill:var(--reader-highlight-soft); }
+body.boox .bx-pdf-hl {
+  position: absolute; box-sizing: border-box;
+  background: var(--reader-highlight-soft); border: 1px dashed var(--reader-highlight-edge);
+}
+body.boox .bx-pdf-hl.draft { background: var(--reader-highlight-soft); border-style: dashed; }
+body.boox .bx-pdf-note {
+  position: absolute; transform: translate(-50%, -50%); width: 28px; height: 28px;
+  border: 2px solid #000; border-radius: 50%; background: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+body.boox .bx-pdf-note svg { width: 18px; height: 18px; }
+body.boox .bx-pdf-text {
+  position: absolute; z-index: 6; overflow: hidden; touch-action: none;
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: none;
+}
+body.boox .bx-pdf-text-run {
+  position: absolute; display: inline-block; color: transparent; white-space: pre;
+  line-height: 1; transform-origin: left top; font-family: sans-serif;
+}
+body.boox .bx-pdf-text-sel { z-index: 9; pointer-events: none; }
+
+/* Persistent freehand sidecar preview. The live daemon surface replaces it only while On page is
+   active; otherwise the SVG keeps handwriting visible without modifying the source PDF/EPUB. */
+body.boox .bx-page-ink-preview {
+  position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden;
+}
+body.boox .bx-page-ink-guard {
+  position: fixed; inset: 0; z-index: 47; background: transparent;
+  touch-action: none; overscroll-behavior: none; cursor: crosshair;
+}
+body.boox .bx-page-ink-done {
+  position: fixed; z-index: 49; left: 10px; top: 50%; transform: translateY(-50%);
+  min-width: 70px; min-height: 56px; padding: 8px 10px; border: 2px solid #000;
+  border-radius: 8px; background: #fff; color: #000; font: 700 13px system-ui, sans-serif;
+}
+
+/* Compact XReader-style annotation rail: tools stay close to the page, visibly selected, and never
+   depend on colour alone. It clears the top/bottom chrome and collapses to icons on narrow screens. */
+body.boox .bx-pdf-tools {
+  position: fixed; z-index: 48; left: 8px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; padding: 4px; gap: 2px;
+  background: #fff; border: 1.5px solid #000; border-radius: 7px;
+}
+body.boox .bx-pdf-tool {
+  width: 66px; min-height: 52px; padding: 4px 2px; border: 0; border-bottom: 1px solid #bbb;
+  background: #fff; color: #000; font-family: system-ui, sans-serif;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+body.boox .bx-pdf-tool:last-child { border-bottom: 0; }
+body.boox .bx-pdf-tool span { font-size: 22px; line-height: 1; }
+body.boox .bx-pdf-tool small { font-size: 10px; font-weight: 700; }
+body.boox .bx-pdf-tool.on { background: #000; color: #fff; }
+@media (max-width: 520px) {
+  body.boox .bx-pdf-tool { width: 48px; }
+  body.boox .bx-pdf-tool small { display: none; }
+}

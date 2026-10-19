@@ -1,0 +1,36 @@
+{
+  "notebookId": "note-interactive",
+  "title": "Interactive Demo",
+  "folderId": "",
+  "createdAt": "2026-06-29T09:00:00.000Z",
+  "updatedAt": "2026-06-29T09:00:00.000Z",
+  "defaultTemplate": "blank",
+  "pages": [
+    {
+      "pageId": "p1",
+      "template": "blank",
+      "blocks": [
+        { "type": "text", "md": "# Interactive page\n\nThis notebook page carries **blocks** (text, MCQ, animation), so it opens in the *interactive reader* rather than the plain handwriting editor." },
+        {
+          "type": "mcq",
+          "prompt": "Which layer owns touch input in editor mode?",
+          "choices": [
+            { "id": "a", "md": "The WebView" },
+            { "id": "b", "md": "The native ink surface (daemon)" },
+            { "id": "c", "md": "Neither" }
+          ],
+          "answer": ["b"],
+          "explain": "In editor mode the e-ink daemon owns the pen; the WebView is transparent on top."
+        }
+      ]
+    },
+    {
+      "pageId": "p2",
+      "template": "blank",
+      "blocks": [
+        { "type": "text", "md": "## Animation block\n\nThe breathing-lungs animation is pure web (SVG + CSS); native just fast-refreshes the region." },
+        { "type": "animation", "kind": "breath" }
+      ]
+    }
+  ]
+}

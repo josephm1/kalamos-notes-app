@@ -1,0 +1,22 @@
+{
+  "id": "mcq-basic",
+  "version": 1,
+  "title": "Basic multiple-choice quiz",
+  "renderer": "mcq-basic",
+  "schema": "schema.json",
+  "example": "example.json",
+  "prompt": "prompt.txt",
+  "pagePolicy": {
+    "questionsPerPage": 1,
+    "resultsPage": true
+  },
+  "limits": {
+    "minQuestions": 1,
+    "maxQuestions": 20,
+    "choicesPerQuestion": 4,
+    "promptChars": 600,
+    "choiceChars": 240,
+    "explanationChars": 1200,
+    "titleChars": 120
+  }
+}

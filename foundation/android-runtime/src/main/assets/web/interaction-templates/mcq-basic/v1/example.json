@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "templateId": "mcq-basic",
+  "templateVersion": 1,
+  "title": "Chapter review",
+  "questions": [
+    {
+      "prompt": "Which statement is best supported by the source?",
+      "choices": [
+        "The first supported statement",
+        "A plausible but unsupported alternative",
+        "A second plausible distractor",
+        "An unrelated claim"
+      ],
+      "correctIndex": 0,
+      "explanation": "The source states the first choice directly.",
+      "evidenceRefs": ["segment-1"]
+    }
+  ]
+}

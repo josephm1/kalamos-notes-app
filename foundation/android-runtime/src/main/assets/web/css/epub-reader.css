@@ -1,0 +1,167 @@
+/* EPUB reader (js/epub-reader.js, AD-4/AD-5). Reuses BookReader's floating-bar chrome classes
+   (bk-topbar/bk-title/bk-ind/bk-fontctl/bk-fbtn/bk-botbar/bk-botrow/bk-navlbl/bk-progress/bk-clock/
+   bk-dogear/bk-botbtns/bk-contents-btn, all in content.css/reader-panels.css) — those are generic reader
+   chrome, not blocks-book-specific. This file owns only the EPUB content flow + its base typography
+   (publisher CSS is OFF by default — AD-4 — so the look of an EPUB page comes entirely from here).
+   E-ink rules: pure B/W, hairlines only, no animation on the flow itself, no scrollbars. */
+
+#epub-view { position: fixed; inset: 0; display: none; flex-direction: column; background: #fff; z-index: 30; }
+
+/* content clipping box — same padding rhythm as .bk-content (book-reader), a two-page spread on wide
+   viewports gets the same generous outer margins. */
+.ep-content { flex: 1 1 auto; position: relative; overflow: hidden; padding: 16px 24px 24px;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
+@media (min-width: 820px) {
+  .ep-content { padding: 26px 44px 34px; }
+}
+
+/* the page box is the visible "paper": centred, sized to the page/spread, clips the sliding flow */
+.ep-pagebox { position: relative; height: 100%; margin: 0 auto; overflow: hidden; }
+.ep-flow { height: 100%; column-gap: 40px; column-fill: auto;
+  font-family: Georgia, 'Noto Serif', 'Times New Roman', serif;
+  font-size: 19px; line-height: 1.5; color: #111;
+  text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+
+.ep-flow p {
+  margin: 0 0 0.8em; text-align: justify; hyphens: auto; -webkit-hyphens: auto;
+  hanging-punctuation: first last; text-indent: 1.2em;
+  word-spacing: var(--rf-word-gap, normal);
+}
+.ep-flow p:first-child { text-indent: 0; }
+.ep-flow ul, .ep-flow ol { margin: 0.5em 0 0.5em 1.4em; padding: 0; }
+.ep-flow li { margin: 0.12em 0; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
+/* trim widows/orphans so paragraphs don't leave a single dangling line across a column break */
+.ep-flow p, .ep-flow li { orphans: 2; widows: 2; }
+
+.ep-flow h1 { font-size: 1.6em; line-height: 1.16; font-weight: 700; text-align: center;
+  margin: 0.3em 0 0.7em; letter-spacing: 0.01em; }
+.ep-flow h2 { font-size: 1.15em; line-height: 1.22; font-weight: 700; margin: 1.2em 0 0.4em; }
+.ep-flow h3 { font-size: 1em; font-weight: 700; font-style: italic; margin: 0.9em 0 0.25em; }
+/* a heading must never be the last line of a column — keep it with the text it introduces */
+.ep-flow h1, .ep-flow h2, .ep-flow h3, .ep-flow h4 { break-after: avoid; -webkit-column-break-after: avoid; }
+
+/* figures/images: never split across a column; capped to one column's height so nothing spills */
+.ep-flow figure { margin: 0.9em 0; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+.ep-flow img { max-width: 100%; max-height: calc(var(--ep-colh, 80vh) - 64px); width: auto; height: auto;
+  object-fit: contain; display: block; margin: 0 auto; }
+.ep-flow figcaption { font-size: 0.8em; color: #444; margin-top: 0.35em; font-style: italic;
+  font-family: system-ui, sans-serif; line-height: 1.32; }
+.ep-flow blockquote { margin: 0.8em 1.4em; font-style: italic; break-inside: avoid; }
+.ep-flow a.reader-link-arming { background: #000; color: #fff; }
+.ep-flow a[data-epub-note-ref]{
+  position:relative;
+  display:inline;
+  margin:0 .06em;
+  padding:0 .08em .03em;
+  border:0;
+  border-bottom:1px solid currentColor;
+  font-family:Arial,Helvetica,sans-serif;
+  font-size:.62em;
+  line-height:1;
+  font-weight:700;
+  text-align:center;
+  text-decoration:none;
+  vertical-align:.55em;
+  white-space:nowrap;
+  touch-action:manipulation;
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.ep-flow a[data-epub-note-ref]::after{
+  content:"";
+  position:absolute;
+  inset:-.7em -.5em;
+}
+.ep-flow a[data-epub-note-ref]:active{background:#000;color:#fff}
+.ep-flow table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 0.85em; }
+.ep-flow th, .ep-flow td { border: 1px solid #000; padding: 4px 6px; text-align: left; vertical-align: top;
+  overflow-wrap: anywhere; word-break: break-word; }
+
+/* Publisher footnotes stay beside the reading position instead of replacing the chapter with an
+   endnotes document. Opaque surfaces and static borders suit e-ink refresh while generous wrapping
+   makes long scholarly notes usable on narrow tablets. */
+.ep-footnote-overlay{
+  position:absolute;
+  inset:0;
+  z-index:90;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  padding:18px;
+  box-sizing:border-box;
+  background:transparent;
+  touch-action:manipulation;
+}
+.ep-footnote-card{
+  width:min(680px,100%);
+  max-height:calc(100% - 36px);
+  display:flex;
+  flex-direction:column;
+  box-sizing:border-box;
+  border:2px solid #000;
+  border-radius:10px;
+  background:#fff;
+  box-shadow:7px 7px 0 #8f8b8f;
+  color:#000;
+  font-family:Georgia,'Noto Serif','Times New Roman',serif;
+}
+.ep-footnote-head{display:flex;align-items:center;min-height:54px;border-bottom:1.5px solid #000}
+.ep-footnote-title{min-width:0;flex:1;margin:0;padding:12px 16px;font:800 20px/1.2 Arial,Helvetica,sans-serif}
+.ep-footnote-close,.ep-footnote-open{
+  min-height:48px;
+  border:0;
+  background:#fff;
+  color:#000;
+  font:800 16px/1 Arial,Helvetica,sans-serif;
+}
+.ep-footnote-close{align-self:stretch;padding:0 17px;border-left:1.5px solid #000}
+.ep-footnote-body{
+  min-height:0;
+  padding:17px 18px;
+  overflow:auto;
+  font-size:18px;
+  line-height:1.48;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.ep-footnote-body p{margin:0 0 .75em;text-indent:0;text-align:left}
+.ep-footnote-body p:last-child{margin-bottom:0}
+.ep-footnote-open{border-top:1.5px solid #000;padding:0 18px;text-align:left}
+.ep-footnote-close:active,.ep-footnote-open:active{background:#000;color:#fff}
+
+/* ===================== WP9 Format panel (js/reader-format.js) =====================
+   EpubReader.applyFormat() sets --rf-* custom properties on .ep-content from ReaderFormat.cssVars();
+   every consumer below falls back to the ORIGINAL hardcoded value when a var is unset, so a chapter
+   with no Format-panel changes made renders pixel-identical to before WP9. Appended (not interleaved)
+   so these rules win the cascade for the specific longhand properties they set. When "Publisher
+   styles" is on, the injected scoped stylesheet (#ep-flow ...) can still override these — expected,
+   that toggle trades the Format panel's spacing controls for the book's own authored look. */
+.ep-flow {
+  font-family: var(--rf-font-family, Georgia, 'Noto Serif', 'Times New Roman', serif);
+  line-height: var(--rf-line-h, 1.5);
+  -webkit-text-stroke: var(--rf-stroke, 0px) #000;
+}
+.ep-flow p { margin-bottom: calc(0.8em + var(--rf-para-gap, 0em)); text-align: var(--rf-align, inherit);
+  hyphens: var(--rf-hyphens, auto); }
+.ep-content.rf-indent-custom .ep-flow p { text-indent: var(--rf-indent, 0) !important; }
+/* "Fit screen" keeps publisher structure and decoration but makes the user's reading choices win
+   for prose. Publisher relative font hierarchy remains intact; only spacing/alignment/indent are
+   overridden, so coloured rules and bespoke headings are not thrown away with the typography. */
+.ep-content.rf-reader-typography .ep-flow p,
+.ep-content.rf-reader-typography .ep-flow li,
+.ep-content.rf-reader-typography .ep-flow blockquote {
+  line-height: var(--rf-line-h, 1.5) !important;
+  text-align: var(--rf-align, left) !important;
+  hyphens: var(--rf-hyphens, none) !important;
+  -webkit-hyphens: var(--rf-hyphens, none) !important;
+}
+.ep-content.rf-reader-typography .ep-flow p {
+  margin-bottom: calc(0.8em + var(--rf-para-gap, 0em)) !important;
+}
+.ep-content { padding-left: calc(24px + var(--rf-margin, 0%)); padding-right: calc(24px + var(--rf-margin, 0%));
+  padding-top: calc(16px + var(--rf-margin-v, 0%)); padding-bottom: calc(24px + var(--rf-margin-v, 0%)); }
+@media (min-width: 820px) {
+  .ep-content { padding-left: calc(44px + var(--rf-margin, 0%)); padding-right: calc(44px + var(--rf-margin, 0%)); }
+}

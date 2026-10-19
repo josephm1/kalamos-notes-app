@@ -1,0 +1,132 @@
+/* Boox UI — reader chrome styles. All scoped under body.boox so the classic reader is untouched
+   when the flag is off. E-ink rules: pure #000 on #fff, hairline/2px outlines, NO grey fills, NO
+   transitions/animations/shadows, NO scrollbars, 48px min tap targets. Uses --bx-* from
+   css/boox-tokens.css. */
+
+/* Hide the classic reader bars — the readers keep writing into them harmlessly (offscreen). */
+body.boox .bk-topbar,
+body.boox .bk-botbar,
+body.boox .bk-clock,
+body.boox .bk-dogear { display: none !important; }
+
+/* ---- top cluster (tab strip + toolbar), revealed by a top-band tap ---- */
+body.boox .bx-r-top {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 46;
+  background: var(--bx-paper); border-bottom: var(--bx-line);
+  display: none;
+}
+body.boox .bx-r-top.show { display: block; }
+body.boox .bx-r-top.arming,
+body.boox .bx-r-bottom.arming { pointer-events: none; }
+
+body.boox .bx-r-tabs { display: flex; height: 44px; border-bottom: var(--bx-line); }
+body.boox .bx-r-tab {
+  display: flex; align-items: center; gap: 10px; padding: 0 16px; max-width: 70%;
+  font-size: 16px; font-weight: 700; background: var(--bx-ink); color: var(--bx-paper);
+}
+body.boox .bx-r-tabtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.boox .bx-r-tabx {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; border: none; background: none; cursor: pointer;
+  color: var(--bx-paper);
+}
+body.boox .bx-r-tabx svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+body.boox .bx-r-toolbar { display: flex; align-items: center; gap: 2px; padding: 8px 10px; }
+body.boox .bx-r-spacer { flex: 1; }
+
+/* ---- bottom nav, revealed by a bottom-band tap (covers the status strip while open) ---- */
+body.boox .bx-r-bottom {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 46;
+  background: var(--bx-paper); border-top: var(--bx-line);
+  display: none; justify-content: space-around; padding: 8px 6px 12px;
+}
+body.boox .bx-r-bottom.show { display: flex; }
+
+/* ---- always-on status strip (replaces bk-clock) ---- */
+body.boox .bx-r-status {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+  height: 28px; padding: 0 18px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bx-paper); border-top: var(--bx-hair);
+  font-size: 14px; font-weight: 600; pointer-events: none;
+}
+body.boox .bx-r-status .bx-r-chap { opacity: .7; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 12px; }
+
+/* ---- bookmark ribbon (visual only; the corner tap toggles it) ---- */
+body.boox .bx-ribbon {
+  position: fixed; top: 0; right: 32px; z-index: 44;
+  width: 30px; height: 40px; pointer-events: none; display: none;
+}
+body.boox .bx-ribbon svg { width: 30px; height: 40px; stroke: var(--bx-ink); stroke-width: 2; fill: var(--bx-ink); }
+
+/* ---- labeled icon buttons (toolbar + bottom nav) ---- */
+body.boox .bx-ic-btn {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 3px;
+  min-width: var(--bx-tap); min-height: var(--bx-tap); padding: 4px 6px;
+  border: none; background: none; cursor: pointer; color: var(--bx-ink);
+  font-size: 11px; font-weight: 600; font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+body.boox .bx-ic-btn .bx-ic { display: flex; }
+body.boox .bx-ic-btn .bx-ic svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 2; fill: none; }
+body.boox .bx-ic-btn.bx-soon { opacity: .4; }
+body.boox .bx-ic-btn.bx-on .bx-ic svg { fill: var(--bx-ink); }
+body.boox .bx-ic-lb { white-space: nowrap; }
+
+/* ---- bespoke Boox bottom sheet (Progress etc.) ---- */
+body.boox .bx-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 210;
+  background: var(--bx-paper); border-top: var(--bx-line);
+  border-top-left-radius: var(--bx-r); border-top-right-radius: var(--bx-r);
+}
+body.boox .bx-sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: var(--bx-hair);
+}
+body.boox .bx-sheet-title { font-size: 18px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.boox .bx-sheet-x {
+  width: 40px; height: 40px; flex: 0 0 auto; border: var(--bx-hair); border-radius: 50%;
+  background: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+body.boox .bx-sheet-x svg { width: 18px; height: 18px; stroke: var(--bx-ink); stroke-width: 2; fill: none; }
+body.boox .bx-sheet-body { padding: 8px 0 12px; }
+
+body.boox .bx-prog-row { display: flex; align-items: center; gap: 14px; padding: 14px 20px; }
+body.boox .bx-prog-ch { min-width: var(--bx-tap); min-height: var(--bx-tap);
+  border: none; background: none; cursor: pointer; font-size: 20px; font-weight: 700; color: var(--bx-ink); }
+body.boox .bx-prog-num { font-size: 16px; font-weight: 700; white-space: nowrap; }
+body.boox input[type=range].bx-prog-slider {
+  -webkit-appearance: none; appearance: none; flex: 1; height: 26px; background: transparent; cursor: pointer;
+}
+body.boox input[type=range].bx-prog-slider::-webkit-slider-runnable-track {
+  height: 4px; background: var(--bx-ink); border-radius: 2px;
+}
+body.boox input[type=range].bx-prog-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bx-paper); border: 3px solid var(--bx-ink); margin-top: -9px;
+}
+body.boox input[type=range].bx-prog-slider::-moz-range-track { height: 4px; background: var(--bx-ink); }
+body.boox input[type=range].bx-prog-slider::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%; background: var(--bx-paper); border: 3px solid var(--bx-ink);
+}
+body.boox .bx-prog-quick { display: flex; justify-content: space-around; padding: 10px 6px 6px; border-top: var(--bx-hair); }
+
+/* ---- restyle the hosted ReaderPanels bottom sheet to the Boox look ---- */
+body.boox .rp-sheet {
+  background: var(--bx-paper); border-top: var(--bx-line);
+  border-top-left-radius: var(--bx-r); border-top-right-radius: var(--bx-r);
+}
+body.boox .rp-sheet.rp-focused { height: 54%; }
+body.boox .rp-sheet.rp-contrast-sheet { height: 46%; }
+body.boox .rp-sheet.rp-format-sheet { height: 55%; }
+body.boox .rp-sheet.rp-search-sheet { height: 50%; }
+body.boox .rp-sheet.rp-focused .rp-tabrow { display: none; }
+body.boox .rp-head { border-bottom: var(--bx-hair); }
+body.boox .rp-title { font-weight: 700; }
+body.boox .rp-tabrow { border-top: var(--bx-line); }
+body.boox .rp-tab { font-size: 15px; font-weight: 700; min-height: var(--bx-tap); border-right: var(--bx-hair); }
+body.boox .rp-tab:last-child { border-right: none; }
+body.boox .rp-tab.sel { background: var(--bx-ink); color: var(--bx-paper); }

@@ -1,0 +1,12 @@
+{
+  "notebookId": "note-welcome",
+  "title": "Welcome",
+  "folderId": "",
+  "createdAt": "2026-06-28T10:00:00.000Z",
+  "updatedAt": "2026-06-28T10:00:00.000Z",
+  "defaultTemplate": "blank",
+  "pages": [
+    { "pageId": "p1", "template": "ruled" },
+    { "pageId": "p2", "template": "blank" }
+  ]
+}

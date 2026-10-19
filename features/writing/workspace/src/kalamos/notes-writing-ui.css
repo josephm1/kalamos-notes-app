@@ -1,0 +1,193 @@
+/* Notes presentation for the canonical writing workspace. Geometry is measured from this DOM.
+   Compact and expanded toolbars have fixed footprints; menus are separate measured overlays. */
+#kalamos-write-workspace-root {
+  position:fixed; inset:0; z-index:60; display:none; overflow:hidden; background:#fff;
+  -webkit-tap-highlight-color:transparent;
+}
+#kalamos-write-workspace-root .pen-workspace { position:relative; padding:12px 12px 20px; }
+#kalamos-write-workspace-root .tool-pill {
+  position:absolute; left:8px; top:min(18vh, calc(100vh - 318px)); z-index:34;
+  display:flex; flex-direction:column; align-items:center; gap:0;
+  width:48px; min-width:48px; height:306px; min-height:306px; max-height:none;
+  padding:0; margin:0; flex-shrink:0; flex-wrap:nowrap; overflow:hidden;
+  background: #fff; opacity: 1; isolation: isolate; border:1px solid #000; border-radius:7px;
+  scrollbar-width:none; -webkit-tap-highlight-color:transparent;
+}
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-core,
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail {
+  display:flex; flex-direction:column; align-items:center; gap:0; width:46px;
+  background: #fff; opacity: 1;
+}
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) .toolbar-history { display:flex; }
+#kalamos-write-workspace-root .tool-pill button {
+  display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+  width:46px; min-width:46px; height:44px; min-height:44px; padding:6px; margin:0;
+  border:0; border-radius:0; box-shadow:none; background:#fff; color:#000;
+  appearance:none; -webkit-appearance:none; -webkit-tap-highlight-color:transparent;
+  transition:none; animation:none; transform:none; user-select:none;
+}
+#kalamos-write-workspace-root .tool-pill button svg {
+  display:block; flex:none; width:27px; height:27px; fill:none; stroke:currentColor; stroke-width:1.7;
+  stroke-linecap:round; stroke-linejoin:round;
+}
+#kalamos-write-workspace-root .tool-pill button.active,
+#kalamos-write-workspace-root .tool-pill button[aria-pressed=true] { background:#000; color:#fff; }
+#kalamos-write-workspace-root .tool-pill button:disabled { color:#999; opacity:1; }
+#kalamos-write-workspace-root .tool-pill button:focus-visible { outline:1px solid #000; outline-offset:-3px; }
+#kalamos-write-workspace-root .tool-pill .pill-sep,
+#kalamos-write-workspace-root .tool-pill .copy-ink,
+#kalamos-write-workspace-root .tool-pill .delete-ink,
+#kalamos-write-workspace-root .tool-pill .convert-ink { display:none !important; }
+#kalamos-write-workspace-root .tool-pill .toolbar-handle {
+  order:-2; width:46px; min-width:46px; height:40px; min-height:40px;
+  margin:0; border:0; border-bottom:1px solid #000; touch-action:none;
+}
+#kalamos-write-workspace-root .tool-pill .toolbar-handle:is(:hover,:focus,:active) {
+  background:#fff; color:#000; box-shadow:none;
+}
+#kalamos-write-workspace-root .tool-pill button:focus:not(:focus-visible) { outline:none; }
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-expand {
+  order:2; border-top:1px solid #999;
+}
+/* Compact contains five tools. Selection actions live in the Lasso menu, so selecting cannot
+   add rows or hide Zoom. The original button nodes and their native flush handlers are reused. */
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-core > :not([data-action=write]):not([data-action=erase]):not([data-action=select]),
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > :not([data-action=undo]):not([data-action=magnify]) { display:none !important; }
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=undo],
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=magnify] { display:flex; }
+#kalamos-write-workspace-root .tool-pill.toolbar-collapsed {
+  left:-1px !important; width:38px; min-width:38px; height:50px; min-height:50px;
+  padding:0; border-left:0; border-radius:0 8px 8px 0; overflow:hidden;
+}
+#kalamos-write-workspace-root .tool-pill.toolbar-collapsed .toolbar-handle {
+  width:36px; min-width:36px; height:48px; min-height:48px; padding:6px; border:0;
+}
+
+/* Expanded chrome: one header and one fixed rail. Only an explicit viewport/Zoom layout
+   changes the rail arrangement; writing, tool activation and menu opening never resize it. */
+#kalamos-write-workspace-root .v-modal.toolbar-mode-full > .v-modal-header {
+  display:flex; align-items:center; justify-content:flex-start; gap:2px;
+  height:48px; min-height:48px; padding:0 6px 0 48px;
+  border-bottom:1px solid #999; background:#fff; z-index:32;
+}
+#kalamos-write-workspace-root .v-modal.toolbar-mode-full > .v-modal-header button {
+  width:44px; min-width:44px; height:46px; min-height:46px;
+  padding:6px; border:0; background:#fff;
+}
+#kalamos-write-workspace-root .v-modal.toolbar-mode-full > .v-modal-header button svg {
+  width:26px; height:26px; fill:none; stroke:#000; stroke-width:1.7;
+}
+#kalamos-write-workspace-root .v-modal.toolbar-mode-full > .v-modal-header .v-modal-title {
+  font-size:16px; font-weight:500; max-width:calc(100vw - 250px);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+#kalamos-write-workspace-root .v-modal.toolbar-mode-full .pen-workspace { padding:8px 10px 20px 60px; }
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools {
+  position:fixed; inset:0; width:auto; min-width:0; max-width:none; height:auto; min-height:0;
+  margin:0; padding:0; border:0; border-radius:0; background:transparent; overflow:visible; pointer-events:none;
+}
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-expand {
+  position:fixed; left:4px; top:3px; width:40px; min-width:40px; height:42px; min-height:42px;
+  padding:5px; border:0; background:#fff; color:#000; pointer-events:auto;
+}
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-core {
+  position:fixed; left:calc(100% - 152px); right:6px; top:0; height:47px;
+  display:flex; align-items:center; justify-content:flex-end; gap:0;
+  padding:0; border:0; background:#fff; pointer-events:auto;
+}
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-core > button {
+  width:44px; min-width:44px; height:46px; min-height:46px;
+}
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-core > .toolbar-page-overview {
+  width:56px; min-width:56px; flex-direction:row; gap:4px; font-size:14px;
+}
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools .toolbar-page-overview svg { width:22px; height:22px; }
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-more-rail {
+  position:fixed; left:6px; top:64px; bottom:auto;
+  display:flex; flex-direction:column; align-items:stretch; gap:0;
+  width:48px; height:618px; max-height:none; padding:0;
+  border:1px solid #000; border-radius:6px; background:#fff; overflow:hidden;
+  pointer-events:auto; scrollbar-width:none;
+}
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-more-rail button {
+  display:flex; width:46px; min-width:46px; height:44px; min-height:44px;
+}
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-more-rail button::after { display:none; }
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-handle { display:none; }
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools .toolbar-more-rail > [data-action=spacing],
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools .toolbar-more-rail > [data-action=undo],
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools .toolbar-more-rail > [data-action=page-add] { border-top:1px solid #999; }
+#kalamos-write-workspace-root .tool-pill.selection-active .toolbar-secondary { display:flex; }
+#kalamos-write-workspace-root .tool-pill::-webkit-scrollbar,
+#kalamos-write-workspace-root .tool-pill > *::-webkit-scrollbar { display:none; }
+@media(max-height:710px) {
+  #kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-more-rail {
+    display:grid; grid-template-columns:repeat(2,46px); grid-auto-rows:44px; width:94px; height:310px;
+  }
+  #kalamos-write-workspace-root .v-modal.toolbar-mode-full .pen-workspace { padding-left:106px; }
+}
+body.magnify-active #kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-more-rail {
+  bottom:34vh; display:grid; grid-template-columns:repeat(2,46px); grid-auto-rows:44px;
+  width:94px; height:310px; max-height:none;
+}
+body.magnify-active #kalamos-write-workspace-root .v-modal.toolbar-mode-full .pen-workspace { padding-left:106px; }
+
+/* Pen menus and colour shortcuts. Only overlays may scroll if a short viewport requires it. */
+#kalamos-write-workspace-root .tool-pill .toolbar-color-slot,
+#kalamos-write-workspace-root .tool-pill .toolbar-color-slot[aria-pressed=true] { background:#fff; color:#000; }
+#kalamos-write-workspace-root .toolbar-color-slot span,
+#kalamos-write-workspace-root .scribe-palette button span {
+  display:block; width:18px; height:18px; background:var(--slot-color); border:1px solid #333; border-radius:50%;
+}
+#kalamos-write-workspace-root .toolbar-color-slot[aria-pressed=true] span,
+#kalamos-write-workspace-root .scribe-palette button[aria-pressed=true] span { outline:1px solid #000; outline-offset:2px; }
+#kalamos-write-workspace-root .pen-settings-panel {
+  width:260px; max-height:calc(100vh - 48px); border:1px solid #000; border-radius:0;
+  font-size:16px; overflow:auto; background:#fff; color:#000;
+}
+#kalamos-write-workspace-root .rw-tool-menu { display:grid; gap:0; padding:0; width:260px; border-radius:0; }
+#kalamos-write-workspace-root .rw-tool-menu > strong { padding:7px 10px; font-size:16px; border-bottom:1px solid #000; }
+#kalamos-write-workspace-root .rw-tool-menu > button {
+  display:flex; align-items:center; min-height:44px; padding:6px 10px; gap:10px;
+  border:0; border-bottom:1px solid #000; border-radius:0; background:#fff; color:#000;
+  text-align:left; font-size:16px;
+}
+#kalamos-write-workspace-root .rw-tool-menu svg { width:26px; height:26px; flex-shrink:0; }
+#kalamos-write-workspace-root .rw-tool-menu > button[aria-pressed=true] { background:#000; color:#fff; }
+#kalamos-write-workspace-root .rw-eraser-settings button,
+#kalamos-write-workspace-root .pen-settings-brushes button,
+#kalamos-write-workspace-root .rw-shape-grid button { border:1px solid #000; background:#fff; color:#000; }
+#kalamos-write-workspace-root .rw-eraser-settings button[aria-pressed=true],
+#kalamos-write-workspace-root .pen-settings-brushes button[aria-pressed=true],
+#kalamos-write-workspace-root .rw-shape-grid button[aria-pressed=true] { background:#000; color:#fff; }
+#kalamos-write-workspace-root .rw-shape-grid button[aria-pressed=true] svg path { stroke:#fff; }
+#kalamos-write-workspace-root .pen-settings-brushes svg { width:36px; height:36px; }
+#kalamos-write-workspace-root .scribe-menu { width:250px; padding:0; }
+#kalamos-write-workspace-root .scribe-menu button { border:0; border-radius:0; background:#fff; color:#000; }
+#kalamos-write-workspace-root .scribe-pen-choice {
+  display:flex; align-items:center; gap:10px; width:100%; min-height:44px; padding:5px 9px; font-size:16px;
+}
+#kalamos-write-workspace-root .scribe-pen-choice > svg { width:26px; height:26px; }
+#kalamos-write-workspace-root .scribe-pen-choice > span:last-child { margin-left:auto; }
+#kalamos-write-workspace-root .scribe-pen-choice[aria-pressed=true] { background:#000; color:#fff; }
+#kalamos-write-workspace-root .scribe-widths {
+  display:grid; grid-template-columns:repeat(5,1fr); border-top:1px solid #000; border-bottom:1px solid #000;
+}
+#kalamos-write-workspace-root .scribe-widths button { display:grid; place-items:center; min-width:0; min-height:44px; padding:2px; }
+#kalamos-write-workspace-root .scribe-widths button svg { width:27px; height:25px; }
+#kalamos-write-workspace-root .scribe-widths button[aria-pressed=true] { background:#000; color:#fff; }
+#kalamos-write-workspace-root .scribe-palette { display:grid; grid-template-columns:repeat(6,1fr); gap:0; padding:4px; }
+#kalamos-write-workspace-root .scribe-palette button { display:grid; place-items:center; min-width:0; min-height:38px; padding:5px; }
+#kalamos-write-workspace-root .scribe-colour-name {
+  display:flex; align-items:center; gap:12px; min-height:44px; width:100%; padding:6px 10px;
+  border-top:1px solid #000; text-align:left; font-size:16px;
+}
+#kalamos-write-workspace-root .scribe-colour-name::before {
+  content:""; width:18px; height:18px; background:var(--slot-color); border:1px solid #333; border-radius:50%;
+}
+#kalamos-write-workspace-root .scribe-scribble {
+  min-height:40px; width:100%; padding:5px 10px; font-size:14px; text-align:left; border-top:1px solid #000;
+}
+#kalamos-write-workspace-root .scribe-scribble[aria-pressed=true]::after { content:"✓"; float:right; }
+#kalamos-write-workspace-root .scribe-menu button:focus-visible { outline:1px solid #000; outline-offset:-2px; }
+#kalamos-write-workspace-root .scribble-erase-toggle { min-height:44px; width:100%; padding:8px 10px; font-size:16px; }

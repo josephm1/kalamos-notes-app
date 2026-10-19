@@ -1,0 +1,108 @@
+/* PDF reader (js/pdf-reader.js, AD-2/AD-3/AD-5). Reuses BookReader/EpubReader's floating-bar chrome
+   classes (bk-topbar/bk-title/bk-botbar/bk-botrow/bk-navlbl/bk-clock/bk-dogear/bk-botbtns/
+   bk-contents-btn, all in content.css/reader-panels.css) — those are generic reader chrome. This file
+   owns only the page-image layout (pf-*) and the Navigation/Contrast panel controls (stepper rows,
+   segmented rows). E-ink rules: pure B/W, hairlines only, no animation, no scrollbars, big tap targets. */
+
+#pdf-view { position: fixed; inset: 0; display: none; flex-direction: column; background: #fff; z-index: 30; }
+
+/* content clipping box: a fixed raster page (no reflow), centred and fit to the container — no
+   scrollbar, no CSS transforms (crop happens server/native-side via the ?crop= request param, AD-3). */
+.pf-content { flex: 1 1 auto; position: relative; overflow: hidden;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
+
+.pf-imgwrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+
+.pf-img { display: block; background: #fff; }
+.pf-img-full { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+/* 2-up spread: each page gets half the width, full height, side by side (no gap — a hairline down the
+   middle would read as a fold; pages already carry their own margins). */
+.pf-img-half { width: 50%; height: 100%; object-fit: contain; }
+
+/* ---- Navigation / Contrast panel controls (rendered inside ReaderPanels' body — reader-panels.css) --- */
+.pf-panel { display: flex; flex-direction: column; }
+.pf-section-label { font-family: system-ui, sans-serif; font-weight: 700; font-size: 12.5px;
+  text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.6; margin: 16px 4px 2px; }
+.pf-section-label:first-child { margin-top: 2px; }
+
+.pf-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 52px; box-sizing: border-box; padding: 6px 4px; border-bottom: 1px solid #ccc;
+  font-family: system-ui, sans-serif; font-size: 15px; color: #000; }
+.pf-row-label { flex: 1 1 auto; }
+
+/* stepper: [-] value [+] — discrete steps only, no drag/slider (e-ink-friendly, no partial-refresh smear) */
+.pf-stepper { display: flex; align-items: center; gap: 0; flex: 0 0 auto; }
+.pf-stepper-btn { width: 44px; height: 44px; border: 2px solid #000; background: #fff; color: #000;
+  font-size: 20px; font-weight: 800; font-family: inherit; line-height: 1; }
+.pf-stepper-btn:active { background: #000; color: #fff; }
+.pf-stepper-val { min-width: 46px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* segmented control: one selected option, solid black fill (no gray) */
+.pf-segrow .pf-seg { flex: 0 0 auto; }
+.pf-seg { display: flex; border: 2px solid #000; border-radius: 8px; overflow: hidden; }
+.pf-seg-btn { padding: 10px 20px; font-size: 14px; font-weight: 700; background: #fff; color: #000;
+  border: none; border-right: 1px solid #000; font-family: inherit; }
+.pf-seg-btn:last-child { border-right: none; }
+.pf-seg-btn.sel { background: #000; color: #fff; }
+
+.pf-note { font-family: system-ui, sans-serif; font-size: 12.5px; opacity: 0.62; padding: 12px 4px 4px;
+  line-height: 1.4; }
+
+/* ---- bottom-bar progress slider: flat B/W track + circular thumb, no gradient/shadow (e-ink rule).
+   Jump-on-release (change event, wired in pdf-reader.js) — dragging only updates the N/M label live. --- */
+.pf-slider { -webkit-appearance: none; appearance: none; flex: 1 1 auto; height: 28px; background: transparent;
+  margin: 0; touch-action: pan-x; }
+.pf-slider::-webkit-slider-runnable-track { height: 4px; background: #000; border-radius: 2px; }
+.pf-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; border: 2.5px solid #000; margin-top: -9px; }
+.pf-slider::-moz-range-track { height: 4px; background: #000; border-radius: 2px; border: none; }
+.pf-slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #fff;
+  border: 2.5px solid #000; }
+
+.pf-botbtns { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+
+/* ==================================================================================================
+   WP10 article mode: a CSS-multicolumn text flow standing in for the page-image body, built the same
+   way EpubReader's ep-content/ep-pagebox/ep-flow is (reader-paginate.js owns the shared column math).
+   Sits as a sibling of .pf-imgwrap inside #pf-content; pdf-reader.js toggles which one is display:none.
+   ================================================================================================== */
+/* pf-content (the shared parent) is position:relative/overflow:hidden but NOT a flex container (it's
+   also home to .pf-imgwrap in bitmap mode) — so, like .pf-imgwrap, this fills it via inset:0 rather
+   than a flex-basis (ep-content can use flex:1 1 auto because #epub-view IS display:flex). */
+.pf-art-content { position: absolute; inset: 0; overflow: hidden; padding: 16px 24px 24px;
+  box-sizing: border-box;
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: none; touch-action: none; }
+@media (min-width: 820px) {
+  .pf-art-content { padding: 26px 44px 34px; }
+}
+.pf-art-pagebox { position: relative; height: 100%; margin: 0 auto; overflow: hidden; }
+.pf-art-flow { height: 100%; column-gap: 40px; column-fill: auto; will-change: transform;
+  font-family: Georgia, 'Noto Serif', 'Times New Roman', serif;
+  font-size: 19px; line-height: 1.5; color: #111;
+  text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+.pf-art-hl, .pf-art-sel { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+.pf-art-sel { z-index: 5; }
+
+.pf-art-page { break-inside: auto; }
+.pf-art-p { margin: 0 0 0.8em; text-align: justify; hyphens: auto; -webkit-hyphens: auto;
+  hanging-punctuation: first last; text-indent: 1.2em; orphans: 2; widows: 2; }
+.pf-art-page:first-child > .pf-art-p:first-child { text-indent: 0; }
+.pf-art-p.pf-art-empty { font-style: italic; opacity: 0.6; text-indent: 0; }
+.pf-art-h { font-size: 1.05em; font-weight: 700; text-align: left; margin: 1.1em 0 0.4em;
+  break-after: avoid; -webkit-column-break-after: avoid; }
+.pf-art-page:first-child > .pf-art-h:first-child { margin-top: 0; }
+
+/* ---- WP9 Format panel (js/reader-format.js) vars — same pattern as epub-reader.css: every consumer
+   falls back to the hardcoded default above, so an untouched book renders identically either way. ---- */
+.pf-art-flow {
+  font-family: var(--rf-font-family, Georgia, 'Noto Serif', 'Times New Roman', serif);
+  line-height: var(--rf-line-h, 1.5);
+  -webkit-text-stroke: var(--rf-stroke, 0px) #000;
+}
+.pf-art-p { margin-bottom: calc(0.8em + var(--rf-para-gap, 0em)); text-align: var(--rf-align, inherit);
+  hyphens: var(--rf-hyphens, auto); }
+.pf-art-content.rf-indent-custom .pf-art-p { text-indent: var(--rf-indent, 0) !important; }
+.pf-art-content { padding-left: calc(24px + var(--rf-margin, 0%)); padding-right: calc(24px + var(--rf-margin, 0%)); }
+@media (min-width: 820px) {
+  .pf-art-content { padding-left: calc(44px + var(--rf-margin, 0%)); padding-right: calc(44px + var(--rf-margin, 0%)); }
+}

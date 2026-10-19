@@ -1,0 +1,95 @@
+/* Boox UI — shared tokens + primitives (badges, ring buttons, toast, scrim, dialog, popover).
+   Everything is scoped under body.boox (or .bx-* namespaced) so it is inert while the classic
+   UI is active. E-ink rules: pure black on pure white, 1px hairline dividers, 2px interactive
+   outlines, black = selected (inverted), NO grey fills, NO transitions/animations/shadows,
+   NO scrollbars, min tap target 48px (see css/common.css design-language comment). */
+
+body.boox{
+  --bx-ink:#000;
+  --bx-paper:#fff;
+  --bx-line:2px solid #000;
+  --bx-hair:1px solid #000;
+  --bx-r:14px;
+  --bx-r-lg:18px;
+  --bx-r-sm:10px;
+  --bx-tap:48px;
+}
+
+/* Icon buttons: bare glyph, no outline (the toolbar hairline carries the structure). Inline
+   SVGs draw with stroke:currentColor; .bx-filled fills the glyph black (= active section). */
+body.boox .bx-icon-btn{
+  background:var(--bx-paper);border:none;color:var(--bx-ink);cursor:pointer;
+  min-width:var(--bx-tap);min-height:var(--bx-tap);padding:6px;
+  display:inline-flex;align-items:center;justify-content:center;border-radius:var(--bx-r-sm);
+}
+body.boox .bx-icon-btn svg{width:26px;height:26px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+body.boox .bx-icon-btn.bx-filled svg{fill:var(--bx-ink)}
+body.boox .bx-icon-btn.bx-on{background:var(--bx-ink);color:var(--bx-paper)}
+body.boox .bx-icon-btn:active{background:var(--bx-ink);color:var(--bx-paper)}
+
+/* Coming-soon affordance: flagged controls sit at 40% opacity (still pure black ink). */
+body.boox .bx-soon{opacity:.4}
+
+/* Thin vertical separator between toolbar icon groups. */
+body.boox .bx-sep{width:1px;height:26px;background:var(--bx-ink);flex:none}
+
+/* Corner tab badge: white tab with a 2px outline, notched into a card corner. The base shape
+   is bottom-left; .bx-tab-tr flips it to top-right. Reused by the reader UI later. */
+body.boox .bx-tab{
+  position:absolute;left:-2px;bottom:-2px;background:var(--bx-paper);border:var(--bx-line);
+  border-radius:0 12px 0 12px;padding:2px 11px;font-size:13px;font-weight:700;color:var(--bx-ink);
+  line-height:1.35;white-space:nowrap;
+}
+body.boox .bx-tab.bx-tab-tr{left:auto;bottom:auto;right:-2px;top:-2px;border-radius:0 12px 0 12px}
+
+/* Solid black circular "done" badge (✓). */
+body.boox .bx-done{
+  position:absolute;right:8px;bottom:8px;width:26px;height:26px;border-radius:50%;
+  background:var(--bx-ink);color:var(--bx-paper);display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:700;
+}
+
+/* Ring button: circular 2px-outlined icon with a caption below (info-dialog actions). */
+body.boox .bx-act{
+  display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;
+  font-size:14px;font-weight:600;color:var(--bx-ink);background:var(--bx-paper);border:none;
+  min-width:var(--bx-tap);min-height:var(--bx-tap);padding:4px;font-family:inherit;
+}
+body.boox .bx-act .bx-ring{
+  width:56px;height:56px;border:var(--bx-line);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;background:var(--bx-paper);
+}
+body.boox .bx-act .bx-ring svg{width:26px;height:26px;stroke:var(--bx-ink);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+body.boox .bx-act:active .bx-ring{background:var(--bx-ink)}
+body.boox .bx-act:active .bx-ring svg{stroke:var(--bx-paper)}
+
+/* Toast: solid black pill, bottom-center, removed by JS after ~1.2s (no fade — e-ink). */
+body.boox .bx-toast{
+  position:fixed;left:50%;bottom:90px;transform:translateX(-50%);
+  background:var(--bx-ink);color:var(--bx-paper);padding:12px 24px;border-radius:24px;
+  font-size:16px;font-weight:600;z-index:220;white-space:nowrap;
+}
+
+/* Scrim: near-invisible white click-catcher (NO grey wash — the dialog's own 2px outline does
+   the separating on e-ink). opacity must stay >0 so the layer still paints and catches taps. */
+body.boox .bx-scrim{position:fixed;inset:0;background:var(--bx-paper);opacity:.01;z-index:200}
+
+/* Dialog: centered card, 2px outline, large radius. */
+body.boox .bx-dialog{
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  background:var(--bx-paper);border:var(--bx-line);border-radius:var(--bx-r-lg);
+  z-index:210;overflow:hidden;max-width:92vw;max-height:88vh;
+}
+
+/* Popover menu (sort menu etc.): outlined card of tappable rows; active row inverts. */
+body.boox .bx-pop{
+  position:fixed;background:var(--bx-paper);border:var(--bx-line);border-radius:var(--bx-r-sm);
+  z-index:215;min-width:190px;overflow:hidden;
+}
+body.boox .bx-pop .bx-pop-item{
+  padding:0 18px;min-height:var(--bx-tap);display:flex;align-items:center;gap:10px;
+  font-size:16px;font-weight:600;cursor:pointer;border-bottom:var(--bx-hair);
+}
+body.boox .bx-pop .bx-pop-item:last-child{border-bottom:none}
+body.boox .bx-pop .bx-pop-item.bx-on{background:var(--bx-ink);color:var(--bx-paper)}
+body.boox .bx-pop .bx-pop-item:active{background:var(--bx-ink);color:var(--bx-paper)}

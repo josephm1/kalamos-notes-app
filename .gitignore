@@ -1,0 +1,33 @@
+.gradle/
+.idea/
+**/build/
+local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
+._*
+.DS_Store
+node_modules/
+features/writing/workspace/dist/
+features/writing/workspace/dist-kalamos/
+features/writing/workspace/*.tsbuildinfo
+lab/ui/_shots/
+
+# Local copyrighted evaluation books; keep the corpus on this machine only.
+/Books-corpus/
+
+# Private source exports and recorded live workbook generations.
+apps/play/private-evaluations/
+
+# Private handwriting images, device notebooks and external-provider records.
+/artifacts/to-do-processing-2026-10-14/
+/artifacts/notes-device-corpus-2026-10-14/
+
+# Private/local runtime material
+.env
+.env.*
+*.pem
+/artifacts/
+/Notes UI/
+*.log

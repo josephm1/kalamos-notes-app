@@ -1,0 +1,788 @@
+:root {
+  --paper: #f7f6f2;
+  --text: #1a1a1a;
+  --muted: #6b6b66;
+  --accent: #3a5a8c;
+  --ink: #1b2a4a;
+  --rule: rgba(0, 0, 0, 0.08);
+  --ink-line: rgba(30, 42, 74, 0.4);
+  --surface: #ffffff;
+  --border: rgba(0, 0, 0, 0.12);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  --danger: #a4342b;
+  --measure: 720px;
+  --top-bar-h: 44px;
+  --page-nav-h: 52px;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --paper: #16171a;
+  --text: #e7e6e2;
+  --muted: #9a9a94;
+  --accent: #8fb0e0;
+  --ink: #cdd8ef;
+  --rule: rgba(255, 255, 255, 0.1);
+  --ink-line: rgba(255, 255, 255, 0.28);
+  --surface: #202226;
+  --border: rgba(255, 255, 255, 0.14);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  --danger: #e0857c;
+  color-scheme: dark;
+}
+
+:root[data-theme="eink"] {
+  --paper: #ffffff;
+  --text: #000000;
+  --muted: #333333;
+  --accent: #000000;
+  --ink: #000000;
+  --rule: rgba(0, 0, 0, 0.25);
+  --ink-line: rgba(0, 0, 0, 0.55);
+  --surface: #ffffff;
+  --border: #000000;
+  --shadow: none;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+.app {
+  min-height: 100%;
+  padding-top: var(--top-bar-h);
+}
+
+/* ---- Top bar ---- */
+.top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--top-bar-h);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  border-bottom: 1px solid var(--border);
+  z-index: 20;
+  transition: transform 0.18s ease;
+}
+:root[data-reduce-motion] .top-bar {
+  transition: none;
+}
+.top-bar.collapsed {
+  transform: translateY(-100%);
+}
+.filename {
+  flex: 1;
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.save-status {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+  white-space: nowrap;
+}
+.save-status.status-conflict,
+.save-status.status-error {
+  color: var(--danger);
+  font-weight: 600;
+}
+.icon-btn {
+  min-width: 44px;
+  min-height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.icon-btn:active {
+  background: var(--rule);
+}
+
+/* ---- Reader (paginated) ---- */
+.reader-viewport {
+  position: fixed;
+  top: var(--top-bar-h);
+  bottom: var(--page-nav-h);
+  left: 0;
+  right: 0;
+  overflow: hidden;
+}
+.reader-page {
+  position: relative;
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 12px max(16px, env(safe-area-inset-left));
+  font-size: 19px;
+  line-height: 1.6;
+  transition: transform 0.15s ease;
+}
+:root[data-reduce-motion] .reader-page {
+  transition: none;
+}
+
+/* Bottom page navigation (owner-requested page turning) */
+.page-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--page-nav-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  gap: 12px;
+  background: var(--paper);
+  border-top: 1px solid var(--border);
+  z-index: 20;
+}
+.page-nav button {
+  min-height: 40px;
+  min-width: 84px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+}
+.page-nav button:disabled {
+  opacity: 0.35;
+}
+.page-indicator {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Floating "Edit section" action for the pen-selected block */
+.selected-actions {
+  position: fixed;
+  bottom: calc(var(--page-nav-h) + 10px);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 21;
+  pointer-events: none;
+}
+.edit-section {
+  pointer-events: auto;
+  min-height: 44px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--paper);
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+/* Editing modal: a focused window over the (still-visible) reading page */
+.editor-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px;
+  background: rgba(0, 0, 0, 0.32);
+}
+.editor-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 96vw);
+  height: min(78vh, 640px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.editor-modal-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 6px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.editor-modal-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+.editor-modal .pen-workspace {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 12px 10px;
+}
+.editor-modal .reflow-surface {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* E-ink: no dim/shadow/blur; a hard-edged white window with a black frame. */
+.editor-modal-backdrop.eink {
+  background: rgba(255, 255, 255, 0.6);
+}
+.editor-modal-backdrop.eink .editor-modal {
+  border: 2px solid #000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Pen coordinate readout (dev only) */
+.pen-log {
+  flex: 0 0 auto;
+  font: 11px ui-monospace, monospace;
+  color: var(--muted);
+  padding: 2px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.block {
+  position: relative;
+  margin: 0.55em 0;
+  padding: 2px 6px;
+  /* Hit area extends slightly into the margins without a visible box. */
+  margin-left: -8px;
+  margin-right: -8px;
+  border-radius: 6px;
+  outline: none;
+  cursor: text;
+}
+.block:focus-visible {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.block.selected {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+h1.block { font-size: 1.9em; line-height: 1.2; margin: 0.6em 0 0.3em; }
+h2.block { font-size: 1.5em; line-height: 1.25; margin: 0.7em 0 0.3em; }
+h3.block { font-size: 1.25em; margin: 0.6em 0 0.2em; }
+h4.block, h5.block, h6.block { font-size: 1.08em; }
+blockquote.block {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+pre.block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-size: 0.85em;
+}
+pre.block code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  white-space: pre;
+}
+.block.list-item {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.list-bullet {
+  color: var(--muted);
+}
+hr.block {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.2em 0;
+}
+.reader a {
+  color: var(--accent);
+}
+.inline-img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* When editing, dim surrounding blocks (no blur — §10). */
+.app.editing .reader > *:not(.active-block-wrapper) {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ---- Inline ink run ---- */
+.ink-run {
+  display: inline-block;
+  vertical-align: baseline;
+}
+.ink-run svg {
+  display: block;
+  overflow: visible;
+}
+
+/* ---- Block editor ---- */
+.active-block-wrapper {
+  margin: 0.4em -8px;
+}
+.block-editor {
+  position: relative;
+  border-left: 2px solid var(--accent);
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+.workspace {
+  position: relative;
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+.workspace-text {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 19px;
+  padding: 0;
+  overflow: hidden;
+}
+.ink-layer {
+  position: absolute;
+  inset: 4px 10px;
+  z-index: 2;
+  pointer-events: none;
+}
+.ink-layer .ink-canvas {
+  pointer-events: auto;
+  display: block;
+}
+.existing-runs {
+  position: absolute;
+  inset: 4px 10px;
+  z-index: 0;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ---- Reflow pen workspace (§5.4) ---- */
+.pen-workspace {
+  position: relative;
+}
+.reflow-surface {
+  position: relative;
+  padding: 4px 8px;
+  /* Must be none: Chromium treats PEN drags as pan gestures too, so pan-y let
+     the browser steal vertical pen movement mid-stroke (pointercancel =
+     dropped strokes on device). Finger scrolling still works outside the
+     surface; touch inside it is re-dispatched as manual scroll in JS. */
+  touch-action: none;
+  border-radius: 8px;
+  min-width: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 19px;
+  font-weight: 400;
+}
+.rw-word {
+  position: absolute;
+  white-space: pre;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  user-select: none;
+}
+.rw-gap {
+  position: absolute;
+  border-bottom: 2px dashed var(--accent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.rw-line-gap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px dashed var(--accent);
+  border-bottom: 2px dashed var(--accent);
+  opacity: 0.45;
+  pointer-events: none;
+}
+.rw-ink {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+.rw-ink.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:root[data-theme="eink"] .rw-ink.selected {
+  outline-color: #000;
+}
+.rw-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.rw-textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  font: inherit;
+  font-size: 19px;
+  color: var(--text);
+  padding: 0;
+}
+.reflow-surface.tool-write { cursor: crosshair; }
+.reflow-surface.tool-insert { cursor: ew-resize; }
+.reflow-surface.tool-lines { cursor: ns-resize; }
+.reflow-surface.tool-erase { cursor: cell; }
+.pill-sep {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+/* ---- Tool pill (§5.3) ---- */
+.tool-pill {
+  position: sticky;
+  bottom: 12px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  margin: 8px auto 10px;
+  padding: 4px;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  z-index: 3;
+  flex-wrap: wrap;
+}
+.tool-pill button {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.tool-pill button.active {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.tool-pill button.cancel {
+  font-size: 14px;
+  color: var(--muted);
+  padding: 0 12px;
+}
+.tool-pill button.done {
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--text);
+  color: var(--paper);
+  padding: 0 16px;
+}
+.tool-pill button.delete-ink {
+  color: var(--danger);
+}
+
+/* ---- Banners ---- */
+.recovery-banner,
+.unplaced-ink {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--top-bar-h);
+  z-index: 25;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.recovery-banner button,
+.conflict-notice button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.unplaced-ink {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+}
+
+/* ---- Welcome ---- */
+.welcome {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 12vh 20px;
+  text-align: center;
+}
+.welcome h1 {
+  font-size: 2.2em;
+  margin: 0 0 6px;
+}
+.welcome-sub {
+  color: var(--muted);
+  margin: 0 0 24px;
+}
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 320px;
+  margin: 0 auto;
+}
+.welcome-actions button,
+.recent button {
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+}
+.welcome-actions button.primary {
+  background: var(--text);
+  color: var(--paper);
+  border-color: var(--text);
+}
+.recent {
+  margin-top: 28px;
+  text-align: left;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.recent h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.recent ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.recent button {
+  width: 100%;
+  text-align: left;
+  padding: 0 12px;
+}
+.welcome-note {
+  margin-top: 32px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ---- Overflow sheet ---- */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+}
+.sheet {
+  width: 100%;
+  max-width: var(--measure);
+  margin: 0 auto;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  padding: 12px 16px 24px;
+  box-shadow: var(--shadow);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.sheet-group {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+.sheet-group button,
+.conflict-notice button {
+  flex: 1;
+  min-height: 44px;
+  min-width: 120px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+}
+.sheet-group button:disabled {
+  opacity: 0.4;
+}
+.conflict-notice {
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.conflict-notice .row {
+  display: flex;
+  gap: 8px;
+}
+.sheet-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+}
+.sheet-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+.sheet-settings label.checkbox,
+.sheet-settings label.color {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.sheet-settings select,
+.sheet-settings input[type="range"] {
+  min-height: 40px;
+}
+
+/* ---- Input diagnostics (dev only) ---- */
+.input-diagnostics {
+  position: fixed;
+  bottom: 6px;
+  left: 6px;
+  z-index: 50;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 60vw;
+  padding: 4px 8px;
+  font: 11px ui-monospace, monospace;
+  background: rgba(0, 0, 0, 0.7);
+  color: #eee;
+  border-radius: 6px;
+  pointer-events: none;
+}
+.input-diagnostics strong {
+  color: #8fb0e0;
+}
+
+/* ---- E-ink / low-refresh optimization (§10) ----
+   Full black-and-white, no animation, and no full-screen repaints. */
+:root[data-theme="eink"] {
+  --muted: #000000;
+}
+:root[data-theme="eink"] * {
+  transition: none !important;
+  animation: none !important;
+}
+:root[data-theme="eink"] .top-bar {
+  background: var(--paper);
+  backdrop-filter: none;
+}
+:root[data-theme="eink"] .block.selected {
+  background: transparent;
+  box-shadow: inset 3px 0 0 #000;
+}
+/* Ink always renders pure black on e-ink. */
+:root[data-theme="eink"] .ink-run svg path,
+:root[data-theme="eink"] .rw-ink path {
+  stroke: #000 !important;
+}
+:root[data-theme="eink"] .rw-gap {
+  border-bottom-color: #000;
+  opacity: 1;
+}
+
+/* Low-refresh mode (any theme): kill animation and avoid dimming the whole
+   document behind the editor, which would force a full-screen e-ink repaint. */
+:root[data-reduce-motion] * {
+  transition: none !important;
+  animation: none !important;
+}
+:root[data-reduce-motion] .app.editing .reader > *:not(.active-block-wrapper),
+:root[data-theme="eink"] .app.editing .reader > *:not(.active-block-wrapper) {
+  opacity: 1;
+}
+/* On e-ink, drop the shadow/rounded card so the active block repaints as a
+   clean rectangle rather than a soft-edged region. */
+:root[data-theme="eink"] .block-editor,
+:root[data-theme="eink"] .pen-workspace .reflow-surface {
+  box-shadow: none;
+  border-radius: 0;
+}
+:root[data-theme="eink"] .active-block-wrapper {
+  border: 2px solid #000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

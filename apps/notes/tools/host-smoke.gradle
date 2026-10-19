@@ -1,0 +1,9 @@
+gradle.projectsEvaluated {
+    def notesProject=gradle.rootProject.findProject(':apps:notes')
+    if(notesProject)notesProject.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        ['Directory':'directory','Stage':'stage','Input':'input','Image':'image','Frame':'frame','TemplateIndex':'templateIndex','KeepApplied':'keepApplied','EditedSheet':'editedSheet','TickElement':'tickElement'].each { option, key ->
+            def value=notesProject.findProperty('notesHost'+option)
+            if(value)systemProperty('notes.host.'+key,value.toString())
+        }
+    }
+}

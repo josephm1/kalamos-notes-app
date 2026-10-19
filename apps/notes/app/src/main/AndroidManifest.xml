@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+    <!-- Lets the user store notebooks in a real folder on another volume (e.g. the SD card) using
+         fast direct file access. Granted by the user via Settings → All files access. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!-- Required for WebView.shouldInterceptRequest to fire on the local kalamos.content virtual
+         host (streams rendered PDF/EPUB pages instead of base64-through-bridge), and for the Notes-owned
+         Format with AI provider client. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <queries><package android:name="com.newoether.agora.einkpreview" /><package android:name="com.newoether.agora" /></queries>
+
+    <application
+        android:name=".KalamosApp"
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/notes_backup_rules"
+        android:dataExtractionRules="@xml/notes_data_extraction_rules"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Kalamos"
+        android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+
+        <meta-data android:name="kalamos.inkTrace" android:value="${inkTrace}" />
+
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleTop"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".sharing.MarkdownImportActivity" android:exported="true" android:excludeFromRecents="true" android:label="Kalamos Notes">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/x-markdown" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".exchange.AgoraDocumentActivity" android:exported="true"
+            android:windowSoftInputMode="adjustResize" android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+            <intent-filter><action android:name="com.kalamos.notes.action.EDIT_DOCUMENT" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
+        </activity>
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.agora-documents" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/agora_document_paths" />
+        </provider>
+    </application>
+
+</manifest>
