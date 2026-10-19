@@ -46,6 +46,7 @@ declare const Bridge: {
   ): void;
   skipWakeRefresh(): void;
   resumeInkBox?(l: number, t: number, r: number, b: number): void;
+  clearMenuSnapshot?(): void;
   snapshotMenu?(l: number, t: number, r: number, b: number, rl: number, rt: number, rr: number, rb: number): void;
   snapshotToolbarRegion(l: number, t: number, r: number, b: number): void;
   clearContent(): void;

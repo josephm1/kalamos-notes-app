@@ -77,6 +77,15 @@ test('cold heavy handwriting pages present complete ink in one request', () => {
   assert.equal(page.strokes.length,80)
 })
 
+test('retiring floating chrome is ordered with captures and does not present or clear document ink', () => {
+  const retire = inkManager.slice(inkManager.indexOf('    fun clearMenuSnapshot()'), inkManager.indexOf('    /** Capture the floating menu'))
+  assert.match(retire, /mainHandler\.post/)
+  assert.match(retire, /enqueueCapture\(0L\) \{ inkSurfaceView\.clearMenuSnapshot\(\) \}/)
+  const model = inkSurface.slice(inkSurface.indexOf('    fun clearMenuSnapshot()'), inkSurface.indexOf('    /** The floating collapsible menu:'))
+  assert.match(model, /menuBitmap = null/)
+  assert.doesNotMatch(model, /commitPage|syncOverlay|invalidate|recycle|contentBitmap|strokes|inkController/)
+})
+
 test('native page composition presents ink and foreground chrome together', () => {
   const compose=inkSurface.slice(inkSurface.indexOf('    private fun renderFromState('),inkSurface.indexOf('    private fun drawDisplayedStrokes('))
   assert.ok(compose.indexOf('drawDisplayedStrokes(c)')<compose.indexOf('commitPage(refreshRect)'))

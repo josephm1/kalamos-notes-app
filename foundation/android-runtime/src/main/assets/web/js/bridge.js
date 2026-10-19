@@ -220,6 +220,10 @@ const Bridge = {
     }
   },
 
+  clearMenuSnapshot() {
+    try { AndroidBridge.clearMenuSnapshot() } catch (e) { console.warn("Bridge.clearMenuSnapshot error:", e) }
+  },
+
   snapshotMenu(left, top, right, bottom, rl, rt, rr, rb) {
     try {
       AndroidBridge.snapshotMenu(left, top, right, bottom, rl, rt, rr, rb)

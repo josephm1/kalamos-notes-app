@@ -364,6 +364,44 @@ describe("Write2Native regional sync", () => {
     expect(vectors).toHaveLength(1);
   });
 
+  it("retires compact foreground when expanded chrome keeps the same composition bounds", () => {
+    vi.useFakeTimers();
+    const bridge = {
+      setInteractivePanel: vi.fn(), setErasing: vi.fn(), setInkEnabled: vi.fn(), flushInk: vi.fn(),
+      setPenType: vi.fn(), setInkStyle: vi.fn(), setWritingBounds: vi.fn(), setWritingExclusion: vi.fn(),
+      detachInkBoxForWeb: vi.fn(), attachInkBox: vi.fn(), snapshotContent: vi.fn(),
+      snapshotContentPartial: vi.fn(), snapshotMenu: vi.fn(), clearMenuSnapshot: vi.fn(), renderInk: vi.fn(),
+    };
+    Object.defineProperty(globalThis, "Bridge", { configurable: true, value: bridge });
+    const paper = document.createElement("div");
+    paper.getBoundingClientRect = () => ({ left: 0, top: 0, right: 600, bottom: 700 } as DOMRect);
+    let expanded = false;
+    const ws = {
+      currentTool: "write", isKeyboard: false, magnifyOpen: false, containerElement: paper,
+      nativeChromeRect: () => expanded ? null : ({ l: 8, t: 100, r: 48, b: 400 }),
+      getNativeInkStrokes: () => [],
+    };
+    const native = new Write2Native();
+    native.attach(ws as never); vi.advanceTimersByTime(220); native.renderNoteStrokes();
+    expect(bridge.snapshotMenu).toHaveBeenCalledOnce();
+    bridge.snapshotContentPartial.mockClear();
+    expanded = true;
+    native.hooks().onWorkspaceLayout?.();
+    expect(bridge.clearMenuSnapshot).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(220);
+    expect(bridge.snapshotContentPartial).toHaveBeenLastCalledWith(0, 0, 600, 700, 0, 0, 600, 700);
+    expect(bridge.clearMenuSnapshot.mock.invocationCallOrder[0]).toBeLessThan(
+      bridge.snapshotContentPartial.mock.invocationCallOrder[0]);
+    native.hooks().onWorkspaceLayout?.(); vi.advanceTimersByTime(220);
+    expect(bridge.clearMenuSnapshot).toHaveBeenCalledOnce();
+    expect(bridge.snapshotMenu).toHaveBeenCalledOnce();
+    expanded = false;
+    native.hooks().onWorkspaceLayout?.(); vi.advanceTimersByTime(220);
+    expect(bridge.snapshotMenu).toHaveBeenCalledTimes(2);
+    expect(bridge.attachInkBox).toHaveBeenCalledOnce();
+    expect(bridge.detachInkBoxForWeb).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])("keeps chrome above replay and handles native resume rejection (%s)", (resumeRejected) => {
     vi.useFakeTimers();
     const bridge = {

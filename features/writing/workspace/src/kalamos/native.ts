@@ -749,6 +749,9 @@ export class Write2Native {
       }, WEB_GEOMETRY_PRESENT_MS);
       return;
     }
+    // Expanded chrome belongs to the content snapshot; compact chrome is retained above ink.
+    // Their composition bounds match, so retire/create the foreground without reattaching ink.
+    if (!!this.lastChrome !== !!ws.nativeChromeRect?.()) this.captureFloatingChrome();
     // Same-geometry observer notifications during sheet mounting do not
     // change the frame just captured. Avoid a duplicate page presentation.
     if (!this.pageTurnSettling) this.syncNative(this.workspaceRegion());
@@ -780,7 +783,15 @@ export class Write2Native {
    * replayed strokes and redraws it after every page render, including heavy-page second frames. */
   private captureFloatingChrome(refresh?: CssRect | null): boolean {
     const rect = this.ws?.nativeChromeRect?.();
-    if (!rect || !hasBridge() || typeof Bridge.snapshotMenu !== "function") return false;
+    if (!hasBridge()) return false;
+    if (!rect) {
+      if (this.lastChrome && typeof Bridge.clearMenuSnapshot === "function") {
+        Bridge.clearMenuSnapshot();
+        this.lastChrome = null;
+      }
+      return false;
+    }
+    if (typeof Bridge.snapshotMenu !== "function") return false;
     const ox = this.boxL / this.dpr, oy = this.boxT / this.dpr;
     const local = { l: rect.l - ox, t: rect.t - oy, r: rect.r - ox, b: rect.b - oy };
     const dirty = this.unionRect(refresh ?? this.lastChrome, local);

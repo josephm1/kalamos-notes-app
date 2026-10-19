@@ -1,3 +1,23 @@
+## Toolbar foreground and single checkbox pen owner — 19 October 2026
+
+Independent export recheck:718 writing tests, typecheck and Android regeneration;116 Notes web
+checks;58 runtime and87 Notes native tests (one skip); Standard and Bigme Notes APK builds pass.
+All515 exported application/feature/runtime files match the canonical current source byte-for-byte.
+
+
+Synchronized the latest canonical Notes source after owner confirmation that the checkbox fix works.
+Expanded chrome now retires the compact toolbar bitmap through the native capture queue without
+recreating the ink surface. Checkbox pen contacts have one native owner while native writing is
+active; WebView finger taps and non-native pen mode retain ordinary controls. This handles native
+batch delivery after an earlier WebView event, including late compatibility clicks after DOM redraw.
+Temporary pen marks are cleaned without saving them. No daemon cadence or waveform changes.
+
+Canonical validation: 718 writing tests/typecheck/regeneration/boundaries and 125 Notes/reader checks
+pass. Standard native runtime58 and Notes87 tests (one skip) passed for the native toolbar handoff;
+both Notes targets built. Latest checkbox Bigme APK installed data-preserving and verified by pulling
+its installed hash:08751b401919380ff78afc249f5e115fabdeea2060a08318d34a3422f5bc558d. Device artifacts,
+notebooks and API settings are excluded from this repository. Physical testing belongs to the owner.
+
 ## Protect new handwriting in blank areas — 19 October 2026
 
 Native delivery now snapshots eligible old ink IDs once before ingesting a stroke batch. Later

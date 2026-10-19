@@ -796,6 +796,13 @@ class InkManager(
         }
     }
 
+    /** Retire foreground ownership in capture order; the following content capture presents it. */
+    fun clearMenuSnapshot() {
+        mainHandler.post {
+            enqueueCapture(0L) { inkSurfaceView.clearMenuSnapshot() }
+        }
+    }
+
     /** Capture the floating menu (bounds left..bottom, surface px) and bake it onto the surface as
      *  the persistent overlay. [refresh*] = the union of the menu's old + new bounds, re-rendered +
      *  refreshed so a collapse clears the area the menu used to cover. */

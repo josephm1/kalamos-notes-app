@@ -536,6 +536,13 @@ class InkSurfaceView @JvmOverloads constructor(
         // HWUI may consume this snapshot after drawBitmap returns; automatic reclamation is safe.
     }
 
+    /** Model-only handoff to content-owned chrome. Do not refresh or recycle submitted bitmaps. */
+    fun clearMenuSnapshot() {
+        menuBitmap = null
+        menuLeft = 0
+        menuTop = 0
+    }
+
     /** The floating collapsible menu: [bmp] is its current snapshot, drawn at ([left],[top]); it
      *  becomes the persistent overlay (redrawn over the page on every render). [refreshRect] (surface
      *  px) is the area to re-render + EPD-refresh — the UNION of the menu's old and new bounds so that

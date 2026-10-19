@@ -12,7 +12,7 @@ import { objectDragBounds, objectPath, objectSvg, drawMarkdownObject, type PageO
 import { isPaperObject, objectContains, objectInkOnPage, objectMinimumSize, maskObjectInk } from "../editor/objectInk";
 import { clipInkPath } from "../ink/clip";
 import { inkToolIcon } from "./inkToolIcons";
-import { bindPenButton } from "./penButton";
+import { bindPenButton, type PenButtonActivation } from "./penButton";
 import { wrapBoxText, placeBoxWords, fitBoxWidth, ruledTextSize, WORKSPACE_FONT_FAMILY, resolveRuledLineHeight, removeBoxWords, withWordRanges, ruledTextFont } from "../editor/textBox";
 import { insertTextFlow } from "../reflow/insertText";
 import type { Block } from "../markdown/parse";
@@ -393,6 +393,7 @@ export class PenWorkspace {
   private liveCanvasBounds: Bounds | null = null;
   private renderedInkStrokes = new Map<string, InkStroke[]>();
   private nativeModelDirty = false;
+  private checkboxActivations = new Map<string, PenButtonActivation>();
   private insertionGuide: { x: number; top: number } | null = null;
 
   private get textSize() { return ruledTextSize(this.lineHeight); }
@@ -2432,8 +2433,11 @@ export class PenWorkspace {
       if (first.x < left || first.x > right || first.y < top || first.y > bottom) continue;
       if (!points.every(p => p.x >= left-12 && p.x <= right+16 && p.y >= top-12 && p.y <= bottom+12)) continue;
       // An X can have two strokes in one native batch. It is still one checkbox action.
+      const activation = this.checkboxActivation(box.id);
+      activation.activatedAt = performance.now();
+      activation.nativePenContact = this.nativeOwnsChecklistPen();
       if (!checkboxGestures.has(box.id)) {
-        this.toggleChecklist(box.id);
+        this.setChecklist(box.id, box.text !== "☑");
         checkboxGestures.add(box.id);
       }
       // Erase the complete temporary mark, including the part outside the control face.
@@ -3986,11 +3990,24 @@ export class PenWorkspace {
     node.innerHTML = objectSvg({...object,x:0,y:0});
   }
 
-  private toggleChecklist(id: string) {
-    const box = this.doc.textBoxes?.find(b => b.id === id && b.checkbox); if (!box) return;
+  private nativeOwnsChecklistPen(): boolean {
+    return this.nativeInkActive && this.tool === "write" && !this.magnifyPad;
+  }
+
+  private checkboxActivation(id: string): PenButtonActivation {
+    let activation = this.checkboxActivations.get(id);
+    if (!activation) { activation = { activatedAt: -Infinity }; this.checkboxActivations.set(id, activation); }
+    return activation;
+  }
+
+  private setChecklist(id: string, checked: boolean) {
+    const box = this.doc.textBoxes?.find(b => b.id === id && b.checkbox);
+    // The daemon may already have applied this contact while the WebView waited for its flush.
+    // Repeating the requested state must not toggle again, add history or capture another frame.
+    if (!box || (box.text === "☑") === checked) return;
     const node = Array.from(this.containerEl.querySelectorAll<HTMLElement>("[data-text-box-word]")).find(n => n.dataset.textBoxWord === id);
     const rect = node?.getBoundingClientRect();
-    this.pushHistory(); const text = box.text === "☑" ? "☐" : "☑";
+    this.pushHistory(); const text = checked ? "☑" : "☐";
     this.doc = { ...this.doc, textBoxes: this.doc.textBoxes?.map(b => b.id === id ? { ...b, text, words: b.words?.map(w => ({ ...w, text })) } : b) };
     // Checked state changes no lane geometry. Keep this repaint bounded;
     // relayout() would request a whole-paper native capture for one checkbox.
@@ -4854,9 +4871,14 @@ export class PenWorkspace {
           check.setAttribute("role", "checkbox"); check.setAttribute("aria-label", "Task complete");
           check.setAttribute("aria-checked", String(checkBox.text === "☑"));
           check.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/>${checkBox.text === "☑" ? '<path d="M6 12l4 4 8-9"/>' : ""}</svg>`;
-          // Finger taps are ordinary WebView controls. The shared flush makes
-          // the new check part of the retained page before native ink resumes.
-          bindPenButton(check, () => this.afterNativeFlush(() => this.toggleChecklist(checkBox.id)));
+          // While native writing owns the paper, only its completed strokes toggle pen controls.
+          // Finger and non-native pen taps remain WebView controls with the normal flush handoff.
+          // Capture the state the user pressed, rather than toggling whatever the flush delivers.
+          // Keep the compatibility-click guard outside this node: renderOverlay replaces it.
+          bindPenButton(check, () => {
+            const checked = checkBox.text !== "☑";
+            this.afterNativeFlush(() => this.setChecklist(checkBox.id, checked));
+          }, true, this.checkboxActivation(checkBox.id), () => this.nativeOwnsChecklistPen());
           span.replaceChildren(check);
         }
         // Starter headings are real text boxes, not baked-in template decoration.

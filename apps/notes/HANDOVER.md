@@ -1,3 +1,40 @@
+## 2026-10-19 — Follow-up: native is the sole checkbox pen owner
+
+User saved/closed; installed Bigme APK and verified the pulled installed hash matches
+08751b401919380ff78afc249f5e115fabdeea2060a08318d34a3422f5bc558d. Evidence:
+artifacts/notes-checkbox-single-owner-2026-10-19/.
+
+Owner observed check-then-revert after installing the first duplicate-contact correction.
+Read-only device logcat confirms WebView-triggered flush completion precedes the native stroke
+batch by about 900 ms. The previous requested-state fix covered native-before-WebView but not
+WebView-before-native: flush may run before the pen-up callback appends its stroke.
+
+In native write mode, checkbox WebView pen release and compatibility click now defer completely
+to native completed-stroke handling; they do not request a flush or disable ink. The control's
+owner-held activation state survives DOM replacement and suppresses late pen clicks until a new
+finger/mouse/keyboard contact. Ordinary WebView pen mode and finger actions retain their existing
+path. Native batches still clean temporary marks without saving ink. No daemon/refresh/cadence
+policy change. Two reverse-delivery regressions failed before the fix and pass after it, covering
+checked and unchecked starts, a 950ms batch delay, later replacement-node click, save/reopen,
+Undo and subsequent finger activation. 718 writing tests/typecheck/regeneration/boundaries and
+125 Notes/reader/KOReader checks pass. Aggregate apps 321/322 retain the unrelated Todo credential
+assertion. Physical pen/panel acceptance remains user-owned.
+
+## 2026-10-19 — Checkbox single-contact and toolbar foreground fixes
+
+- Checkbox pen activation now survives DOM replacement. Native recognition and queued WebView
+  activation set an explicit requested state, preventing the same contact's compatibility click
+  or native flush from undoing an untick. Temporary checkbox marks remain unsaved; Undo and
+  checkpoint/reopen are covered. Reproduced the re-tick with failing tests before fixing it.
+- Read-only device screenshot `/tmp/notes-toolbar-overlap.png` shows compact chrome above the
+  expanded rail. CDP confirms exactly one expanded toolbar in the DOM: the duplicate is the old
+  retained native foreground. Same-geometry layout now retires it through the serialized capture
+  queue before the content capture. Compact mode reacquires its foreground without reattaching ink.
+- Validation: 717 writing tests, typecheck/regenerated Android assets/boundaries, 116 Notes web
+  checks, 9 reader/KOReader checks pass. Standard runtime 58 tests and Notes native 87 tests
+  (one skip) pass; Standard Notes APK builds. Aggregate apps gate retains the unrelated known
+  Todo protected-credential assertion (320/321 pass). User owns physical-device acceptance.
+
 ## 2026-10-17 — Bars handle and stable high-contrast press rendering
 
 - Read-only device screenshot shows the compact handle with a pale blue browser tap highlight.

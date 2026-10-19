@@ -2,7 +2,7 @@
 
 Private Android notebook app with ruled handwriting, editable Markdown, page overview, AI formatting and Android sharing. Supports standard Android and Bigme e-ink devices.
 
-This repository is a self-contained source snapshot of the active Notes app and its shared dependency modules, exported on 19 October 2026 from the Kalamos monorepo. It includes the latest toolbar composition fix. Other Kalamos apps, historical archives, local notebooks, device captures and build outputs are excluded. No sibling checkout is required.
+This repository is a self-contained source snapshot of the active Notes app and its shared dependency modules, exported on 19 October 2026 from the Kalamos monorepo. It includes the latest toolbar foreground handoff and single-owner checkbox pen handling. Other Kalamos apps, historical archives, local notebooks, device captures and build outputs are excluded. No sibling checkout is required.
 
 ## Build
 

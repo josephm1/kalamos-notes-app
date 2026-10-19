@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, expect, it } from 'vitest';
+import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { PenWorkspace } from './penWorkspace';
 import { createNotebookTemplate } from '../editor/notebookTemplates';
 import { DEFAULT_PREFERENCES } from '../storage/preferences';
@@ -9,12 +9,12 @@ beforeAll(() => {
   (HTMLCanvasElement.prototype as unknown as {getContext:()=>unknown}).getContext = () => ({font:'',measureText:(text:string)=>({width:text.length*8}),setTransform(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},stroke(){},fill(){},arc(){}});
   (globalThis as unknown as {ResizeObserver:unknown}).ResizeObserver = class {observe(){} disconnect(){}};
 });
-afterEach(()=>{workspaces.forEach(ws=>ws.destroy());workspaces.length=0;document.body.replaceChildren();});
-function open(id='tasks', saved?: CommitPayload, overflow?: (height:number)=>void) {
+afterEach(()=>{vi.useRealTimers();workspaces.forEach(ws=>ws.destroy());workspaces.length=0;document.body.replaceChildren();});
+function open(id='tasks', saved?: CommitPayload, overflow?: (height:number)=>void, beforeAction?: (action:()=>void)=>void, native=true) {
   const starter = createNotebookTemplate(id,'QA',320,56);
   const host = document.createElement('div');document.body.append(host);
   let payload: CommitPayload | undefined;
-  const ws = new PenWorkspace(host,{pageTools:overflow?{index:0,count:1,change(){},overflow}:undefined,block:parseMarkdown(starter.source)[0],existingRuns:saved?.newRuns??[],existingTextBoxes:saved?.textBoxes??starter.sidecar.textBoxes,existingPageObjects:saved?.pageObjects,existingLineHeight:56,prefs:{...DEFAULT_PREFERENCES,lineHeight:56},eink:true,native:true,onCommit:value=>{payload=value;},onCancel(){}});
+  const ws = new PenWorkspace(host,{onBeforeNativeAction:beforeAction,pageTools:overflow?{index:0,count:1,change(){},overflow}:undefined,block:parseMarkdown(starter.source)[0],existingRuns:saved?.newRuns??[],existingTextBoxes:saved?.textBoxes??starter.sidecar.textBoxes,existingPageObjects:saved?.pageObjects,existingLineHeight:56,prefs:{...DEFAULT_PREFERENCES,lineHeight:56},eink:true,native,onCommit:value=>{payload=value;},onCancel(){}});
   workspaces.push(ws); return {ws,host,saved:()=>payload!};
 }
 function click(host:HTMLElement,label:string) { const el=host.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);expect(el).not.toBeNull();el!.click(); }
@@ -74,7 +74,7 @@ it('finger checklist taps remain checked when vertical spacing moves their row',
   expect(box.text).toBe('☑');expect(box.words![0].y).toBeGreaterThan(112);
 });
 it('WebView pen release activates a checkbox once without a compatibility click saving ink',()=>{
-  const {ws,host}=open(),button=host.querySelector<HTMLButtonElement>('[role=checkbox]')!;
+  const {ws,host}=open('tasks',undefined,undefined,undefined,false),button=host.querySelector<HTMLButtonElement>('[role=checkbox]')!;
   for(const type of ['pointerdown','pointerup']) {
     const event=new MouseEvent(type,{bubbles:true});
     Object.defineProperties(event,{pointerType:{value:'pen'},pointerId:{value:99}});
@@ -83,6 +83,70 @@ it('WebView pen release activates a checkbox once without a compatibility click 
   button.click();
   expect(host.querySelector('[role=checkbox]')?.getAttribute('aria-checked')).toBe('true');
   expect(ws.getNativeInkStrokes()).toHaveLength(0);
+});
+it('unchecking with a WebView pen release survives a compatibility click on the redrawn checkbox',()=>{
+  const {ws,host}=open('tasks',undefined,undefined,undefined,false);
+  const box=ws.reflowDoc.textBoxes!.find(b=>b.checkbox)!;
+  ws.applyNativeWriteStroke([{x:280,y:box.y+22,t:1,pressure:.5}],false);
+  const button=host.querySelector<HTMLButtonElement>('[role=checkbox]')!;
+  for(const type of ['pointerdown','pointerup']) {
+    const event=new MouseEvent(type,{bubbles:true});
+    Object.defineProperties(event,{pointerType:{value:'pen'},pointerId:{value:99}});
+    button.dispatchEvent(event);
+  }
+  expect(host.querySelector('[role=checkbox]')?.getAttribute('aria-checked')).toBe('false');
+  host.querySelector<HTMLButtonElement>('[role=checkbox]')!.click();
+  expect(host.querySelector('[role=checkbox]')?.getAttribute('aria-checked')).toBe('false');
+  expect(ws.getNativeInkStrokes()).toHaveLength(0);
+});
+it('native-only unticking suppresses its replacement-node click without blocking another checkbox',()=>{
+  const {ws,host}=open();
+  const box=ws.reflowDoc.textBoxes!.find(b=>b.checkbox)!;
+  const tap=()=>ws.applyNativeWriteStroke([{x:280,y:box.y+22,t:1,pressure:.5}],false);
+  tap();tap();
+  const buttons=host.querySelectorAll<HTMLButtonElement>('[role=checkbox]');
+  buttons[0].click();
+  expect(host.querySelector('[role=checkbox]')?.getAttribute('aria-checked')).toBe('false');
+  buttons[1].click();
+  expect(ws.reflowDoc.textBoxes!.filter(b=>b.checkbox).slice(0,2).map(b=>b.text)).toEqual(['☐','☑']);
+});
+it.each([false,true])('native owns checkbox pen contact with a delayed batch (%s)',async initiallyChecked=>{
+  vi.useFakeTimers();
+  const queued:Array<()=>void>=[];
+  const {ws,host,saved}=open('tasks',undefined,undefined,action=>queued.push(action));
+  const box=ws.reflowDoc.textBoxes!.find(b=>b.checkbox)!;
+  const tap=()=>ws.applyNativeWriteStroke([{x:280,y:box.y+22,t:1,pressure:.5}],false);
+  if(initiallyChecked) tap();
+  const state=()=>host.querySelector('[role=checkbox]')?.getAttribute('aria-checked');
+  const button=host.querySelector<HTMLButtonElement>('[role=checkbox]')!;
+  for(const type of ['pointerdown','pointerup']) {
+    const event=new MouseEvent(type,{bubbles:true});
+    Object.defineProperties(event,{pointerType:{value:'pen'},pointerId:{value:99}});
+    button.dispatchEvent(event);
+  }
+  // WebView pen-up precedes native completion. No independent toggle or premature flush.
+  button.click();
+  expect(queued).toHaveLength(0);
+  expect(state()).toBe(String(initiallyChecked));
+  vi.advanceTimersByTime(950);
+  tap();
+  expect(state()).toBe(String(!initiallyChecked));
+  // A late compatibility click on the replacement node still belongs to that contact.
+  vi.advanceTimersByTime(1500);
+  host.querySelector<HTMLButtonElement>('[role=checkbox]')!.click();
+  expect(queued).toHaveLength(0);
+  expect(state()).toBe(String(!initiallyChecked));
+  const checkpoint=ws.checkpoint();queued.shift()!();await checkpoint;
+  expect(open('tasks',saved()).host.querySelector('[role=checkbox]')?.getAttribute('aria-checked')).toBe(String(!initiallyChecked));
+  expect(saved().newRuns).toHaveLength(0);
+  ws.magnifyUndo();expect(state()).toBe(String(initiallyChecked));
+  // Finger contact resets ownership and retains the normal flush handoff.
+  const finger=host.querySelector<HTMLButtonElement>('[role=checkbox]')!;
+  const down=new MouseEvent('pointerdown',{bubbles:true});
+  Object.defineProperties(down,{pointerType:{value:'touch'},pointerId:{value:100}});
+  finger.dispatchEvent(down);finger.click();
+  expect(queued).toHaveLength(1);
+  queued.shift()!();expect(state()).toBe(String(!initiallyChecked));
 });
 it('free shapes draw, save, export, remain independent of line spacing, and Undo',async()=>{
   const {ws,host,saved}=open('ruled');click(host,'Shapes / free drawing');click(host,'Rectangle');

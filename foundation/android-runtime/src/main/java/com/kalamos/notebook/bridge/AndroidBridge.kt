@@ -272,6 +272,9 @@ class AndroidBridge(
         inkManager?.refreshChrome()
     }
 
+    @JavascriptInterface
+    fun clearMenuSnapshot() { inkManager?.clearMenuSnapshot() }
+
     /** Bake the floating collapsible menu at its bounds (left..bottom). [refresh*] = union of old +
      *  new menu bounds so a collapse clears the area it used to cover. */
     @JavascriptInterface

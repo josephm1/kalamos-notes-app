@@ -1138,3 +1138,16 @@ invalidates older pending background previews and uses the same model-rendered t
 The old ruled screenshot fallback has been removed. Shared classic-reader capture APIs still have
 active consumers. Automated/browser checks do not establish physical Home/resume handwriting
 continuity; evidence and installation status: `artifacts/notes-home-save-2026-10-18/verification.md`.
+
+## 2026-10-19 — Compact-to-expanded foreground ownership
+
+Normal expanded and compact Notes toolbars share a composition surface. Expanded header/rail
+chrome is owned by the content snapshot; only the compact pill has a retained menu bitmap.
+Same-geometry layout transitions must reconcile that ownership, not merely recapture content:
+otherwise the prior compact bitmap remains above the expanded toolbar on every ink replay.
+`clearMenuSnapshot` runs in InkManager's serialized capture queue after older captures, drops
+only the retained menu reference, and performs no presentation or bitmap recycling. The following
+normal content capture presents the expanded chrome. Returning to compact captures a foreground
+again. This requires no daemon restart, detach/attach, waveform or refresh-delay changes.
+Regression coverage: writing native bridge same-geometry expand/collapse and Notes runtime seam
+checks for ordered, model-only retirement. Physical panel acceptance remains user-owned.
