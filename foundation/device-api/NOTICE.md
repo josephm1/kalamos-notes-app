@@ -1,14 +1,13 @@
-# License notice
+# Copyright, attribution and licence
 
-Original Kalamos contributions in this directory are licensed under the GNU Affero General Public
-License, version 3 or (at your option) any later version (SPDX: AGPL-3.0-or-later).
-Copyright remains with the respective authors. The rights holder approved this license on
-15 October 2026. The full license text is in LICENSE.
+Kalamos InkSDK adaptation: GNU General Public License version 3 (`GPL-3.0-only`).
+The complete text is in [LICENSE](LICENSE). Copyright remains with the respective authors.
 
-Existing third-party copyright notices and license terms remain in effect. In the handwriting
-plugin, androidbridge.lua's JNI-derived scaffolding retains its Alexander Mikhailian MIT notice
-and the full MIT text in LICENSES/Android-App-Launcher-MIT.txt. Launcher changes belong to the
-separate MIT-licensed upstream launcher repository. Dependencies retain their own licenses.
+Original InkSDK: **[Ed Wei (imedwei) and contributors](https://github.com/imedwei/inksdk)**.
+Ink contracts, defaults and performance counters build on the upstream work.
+Kalamos contributors maintain the reorganized contracts, generic Android support and subsequent
+editing, diagnostics and lifecycle changes. This is an independently maintained adaptation.
 
-This notice does not license any other app, app certificate, credential, private book or vendor
-firmware. Firmware-provided classes are accessed at runtime and are not included as SDK binaries.
+See [InkSDK attribution and dependency terms](../../docs/licensing/INKSDK.md).
+Third-party libraries and proprietary firmware retain their own terms. This notice does not
+license unrelated app code, credentials, user documents or vendor firmware.

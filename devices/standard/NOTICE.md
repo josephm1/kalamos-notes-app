@@ -1,6 +1,13 @@
-# License notice
+# Copyright, attribution and licence
 
-Original Kalamos source in this module is licensed under AGPL-3.0-or-later, retaining the
-owner-approved licensing of the Kalamos ink modules. Copyright remains with its authors.
-The full license is in LICENSE. Android/AndroidX and other dependencies retain their own licenses.
-This module includes no vendor firmware, app certificates, user notebooks or credentials.
+Kalamos InkSDK adaptation: GNU General Public License version 3 (`GPL-3.0-only`).
+The complete text is in [LICENSE](LICENSE). Copyright remains with the respective authors.
+
+Original InkSDK: **[Ed Wei (imedwei) and contributors](https://github.com/imedwei/inksdk)**.
+The public Android stylus provider is a Kalamos implementation of the ink contracts.
+Kalamos contributors maintain the reorganized contracts, generic Android support and subsequent
+editing, diagnostics and lifecycle changes. This is an independently maintained adaptation.
+
+See [InkSDK attribution and dependency terms](../../docs/licensing/INKSDK.md).
+Third-party libraries and proprietary firmware retain their own terms. This notice does not
+license unrelated app code, credentials, user documents or vendor firmware.

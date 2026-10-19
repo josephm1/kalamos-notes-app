@@ -1,3 +1,11 @@
+## Upstream attribution and ink licensing — 19 October 2026
+
+Added prominent original-project credit and licence scope. Ink modules now use GPL-3.0-only;
+Ed Wei's original InkSDK is credited in module notices and docs/licensing/INKSDK.md. Original
+reader plugin/bridge AGPL and launcher/JNI MIT notices remain separate. Complete licence texts
+and dependency attributions are included. Licensing/documentation changes only; no pen behavior,
+refresh policy, binary build or device acceptance change.
+
 ## Remove retired MyScript provider — 19 October 2026
 
 Removed the SDK dependency, native recognizer, app certificate and all bundled recognition
