@@ -35,6 +35,10 @@ interface DeviceProvider {
     /** One-time process initialization, including any hidden-API or vendor service preparation. */
     fun initialize(context: Context)
 
+    /** Identify stylus input for hosts that also receive raw native input events. */
+    fun isPenInputDevice(deviceId: Int): Boolean = android.view.InputDevice.getDevice(deviceId)
+        ?.supportsSource(android.view.InputDevice.SOURCE_STYLUS) == true
+
     /** Creates a fresh controller for one low-latency writing session. */
     fun createInkController(): InkController
 

@@ -17,3 +17,9 @@ The controller:
 Build it with `-Pkalamos.device=standard` (the default). Use
 `-Pkalamos.device=bigme` explicitly for BigMe builds. Physical latency, palm rejection, eraser
 delivery and persistence still require a user acceptance pass on each tablet.
+
+The optional InkEditingController contract supports NativeActivity hosts such as modified KOReader:
+capture-only eraser/selection gestures, per-contact drawing decisions, excluded toolbar contacts,
+and cropped chrome updates. NativeActivity hosts forward their owned raw MotionEvents through the
+host adapter; ordinary Notes Views use the existing listener. Do not feed a contact through both.
+Authoritative bitmap replacement uses SRC so a transparent reset actually retires old live pixels.

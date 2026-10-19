@@ -1,3 +1,12 @@
+## Reusable InkSDK and generic reader contract — 19 October 2026
+
+Shared API/providers now expose optional editing capabilities so KOReader can reuse Notes'
+Standard MotionEvent pen implementation. Standard backing updates use SRC for authoritative
+transparent clears; capture-only gestures and cropped chrome preserve ordinary writing. Bigme
+method bodies/cadence unchanged. Notes still owns document semantics above the ink SDK. Native
+API/provider42 tests and Notes87 tests (one skip) pass in the canonical workspace. Generic/Bigme
+builds remain separate packaging targets; there is no app-to-app or sibling source dependency.
+
 ## Toolbar foreground and single checkbox pen owner — 19 October 2026
 
 Independent export recheck:718 writing tests, typecheck and Android regeneration;116 Notes web

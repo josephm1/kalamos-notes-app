@@ -26,8 +26,8 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.kalamos.device.api.ink.StrokeCallback
 import com.kalamos.device.api.ink.StrokePoint
-import com.kalamos.device.bigme.BigmeInkController
-import com.kalamos.device.bigme.BigmePenInput
+import com.kalamos.device.api.DeviceRegistry
+import com.kalamos.device.api.ink.InkEditingController
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -90,7 +90,7 @@ object KalamosBridge {
 
     private val completed = ConcurrentLinkedQueue<JSONObject>()
     private val toolEvents = ConcurrentLinkedQueue<JSONObject>()
-    private var controller: BigmeInkController? = null
+    private var controller: InkEditingController? = null
     private val eraseRefreshHandler = Handler(Looper.getMainLooper())
     private var pendingEraseClean: Runnable? = null
     private var pendingEraseDirty: Rect? = null
@@ -145,7 +145,7 @@ object KalamosBridge {
 
     private data class ReplayRequest(
         val activity: Activity,
-        val controller: BigmeInkController,
+        val controller: InkEditingController,
         val surface: SurfaceView,
         val strokes: List<InkStroke>,
         val strokeWidth: Float,
@@ -170,15 +170,54 @@ object KalamosBridge {
     /** Startup probe and lifecycle registration for the Lua/JNI application-class-loader seam. */
     @JvmStatic
     fun ping(activity: Activity): String {
-        val supported = BigmeInkController.isBigmeDevice()
+        val provider = DeviceRegistry.require(activity)
+        val probe = provider.createInkController() as? InkEditingController
+        val supported = probe?.isAvailable == true
         if (supported) activity.runOnUiThread { observeHost(activity) }
         return JSONObject()
         .put("ok", true)
         .put("apiVersion", 1)
         .put("inkAvailable", supported)
+        .put("motionForwarding", probe?.requiresMotionForwarding == true)
         .put("activity", activity.javaClass.name)
         .toString()
     }
+
+    /** NativeActivity bypasses Java touch dispatch. Forward one coalesced pen event from Lua.
+     * Capture the session before posting so late events can never reach a replacement document. */
+    @JvmStatic
+    fun penMotion(activity: Activity, json: String): String = runCatching {
+        val ink = controller ?: return "{\"ok\":false}"
+        val target = surface ?: return "{\"ok\":false}"
+        if (!ink.requiresMotionForwarding || !hostForeground) return "{\"ok\":false}"
+        val generation = sessionGeneration
+        val payload = JSONObject(json)
+        val action = payload.getInt("action")
+        val samples = payload.getJSONArray("samples")
+        if (samples.length() == 0 || action !in setOf(0,1,2,3)) return "{\"ok\":false}"
+        activity.runOnUiThread {
+            if (generation != sessionGeneration || controller !== ink || surface !== target || !hostForeground) return@runOnUiThread
+            val location = IntArray(2); target.getLocationInWindow(location)
+            val first = samples.getJSONArray(0)
+            val props = android.view.MotionEvent.PointerProperties().apply { id=0; toolType=android.view.MotionEvent.TOOL_TYPE_STYLUS }
+            fun coords(sample: JSONArray) = android.view.MotionEvent.PointerCoords().apply {
+                x=sample.getDouble(0).toFloat()-location[0]; y=sample.getDouble(1).toFloat()-location[1]
+                pressure=sample.getDouble(2).toFloat()
+            }
+            val event=android.view.MotionEvent.obtain(payload.getLong("downTime"),first.getLong(3),
+                if (samples.length()>1) android.view.MotionEvent.ACTION_MOVE else action,
+                1,arrayOf(props),arrayOf(coords(first)),0,0,1f,1f,0,0,android.view.InputDevice.SOURCE_STYLUS,0)
+            try {
+                for (i in 1 until samples.length()) {
+                    val sample=samples.getJSONArray(i)
+                    event.addBatch(sample.getLong(3),arrayOf(coords(sample)),0)
+                }
+                event.action=action
+                ink.onMotionEvent(event)
+            } finally { event.recycle() }
+        }
+        "{\"ok\":true}"
+    }.getOrElse { JSONObject().put("ok",false).put("err",it.message).toString() }
 
     /** Bounds are in the activity content view's physical pixels. */
     @JvmStatic
@@ -287,10 +326,11 @@ object KalamosBridge {
                 Gravity.TOP or Gravity.START
             ))
             surface = inkSurface
-            inkSurface.post {
-                if (requestId != startRequests.get() || !hostForeground || sessionGeneration != generation || surface !== inkSurface) return@post
+            val inkController = (DeviceRegistry.require(activity).createInkController() as InkEditingController)
+            val attachInk = Runnable {
+                if (requestId != startRequests.get() || !hostForeground || sessionGeneration != generation || surface !== inkSurface) return@Runnable
                 val attachStartedMs = SystemClock.elapsedRealtime()
-                val inkController = BigmeInkController().also { controller = it }
+                controller = inkController
                 inkController.setStrokeStyle(strokeWidth, liveColor)
                 inkController.setCaptureOnly(captureOnly())
                 inkController.setDashMode(currentStyle.tool == "lasso" || currentStyle.tool == "eraser" && currentStyle.eraser == "range")
@@ -341,6 +381,8 @@ object KalamosBridge {
                     }
                 }
             }
+            if (inkController.requiresMotionForwarding) runWhenInkSurfaceReady(inkSurface, attachInk)
+            else inkSurface.post(attachInk)
         }
         JSONObject().put("ok", true).put("scheduled", true).toString()
     }.getOrElse { JSONObject().put("err", it.message ?: "ink-start-failed").toString() }
@@ -403,7 +445,9 @@ object KalamosBridge {
 
     /** Used once per Android input device by KOReader's raw motion filter. */
     @JvmStatic
-    fun isPenInputDevice(deviceId: Int): Boolean = BigmePenInput.isPenDevice(deviceId)
+    fun isPenInputDevice(deviceId: Int): Boolean = inkHost?.get()?.let {
+        DeviceRegistry.require(it).isPenInputDevice(deviceId)
+    } ?: false
 
     private fun recordDaemonPenSignal(down: Boolean) {
         daemonPenDown = down
@@ -1036,8 +1080,13 @@ object KalamosBridge {
         return strokes
     }
 
+    // Standard Android delivers incremental historical samples; Bigme delivers one completed list.
+    // Normalize here so Notes' incremental callback contract remains unchanged.
+    private val standardStrokePoints = ArrayList<StrokePoint>()
     private val CALLBACK = object : StrokeCallback {
         override fun onStrokeBegin(x: Float, y: Float, pressure: Float, timestampMs: Long) {
+            standardStrokePoints.clear()
+            if (controller?.consumesMotionEvents == true) standardStrokePoints.add(StrokePoint(x, y, pressure, timestampMs))
             // An old eraser frame must never replace pixels from a newer live stroke.
             pendingEraseClean?.let(eraseRefreshHandler::removeCallbacks)
             pendingEraseClean = null
@@ -1061,6 +1110,7 @@ object KalamosBridge {
         }
 
         override fun onStrokeMove(x: Float, y: Float, pressure: Float, timestampMs: Long) {
+            if (controller?.consumesMotionEvents == true) standardStrokePoints.add(StrokePoint(x, y, pressure, timestampMs))
             recordDaemonPenSignal(true)
             if (activeStrokeStyle.tool == "lasso" && (lassoGesture == "move" || lassoGesture == "resize"))
                 previewSelection(x, y)
@@ -1074,6 +1124,12 @@ object KalamosBridge {
                 previewSelection(x, y, force = true)
             toolbar?.hidePlacementGuide()
             toolbar?.hideTrail()
+            if (controller?.consumesMotionEvents == true) {
+                standardStrokePoints.add(StrokePoint(x, y, pressure, timestampMs))
+                val points = standardStrokePoints.toList()
+                standardStrokePoints.clear()
+                onStrokeComplete(points)
+            }
         }
 
         override fun onStrokeComplete(points: List<StrokePoint>) {

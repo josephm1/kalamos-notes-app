@@ -12,7 +12,7 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.SurfaceView
 import android.view.View
-import com.kalamos.device.api.ink.InkController
+import com.kalamos.device.api.ink.InkEditingController
 import com.kalamos.device.api.ink.InkDefaults
 import com.kalamos.device.api.ink.PerfCounters
 import com.kalamos.device.api.ink.PerfMetric
@@ -26,7 +26,9 @@ import kotlin.math.hypot
  * and eraser gestures remain available to the WebView below the SurfaceView. Historical points are
  * delivered before the current sample so fast pen motion does not lose Android's coalesced data.
  */
-class StandardInkController : InkController {
+class StandardInkController : InkEditingController {
+    override val requiresMotionForwarding: Boolean = true
+    override fun onMotionEvent(event: MotionEvent): Boolean = handleTouch(event)
     @Volatile
     override var isActive: Boolean = false
         private set
@@ -43,6 +45,11 @@ class StandardInkController : InkController {
     private var enabled = true
     private var eraserMode = false
     private var pressureMode = false
+    private var captureOnly = false
+    private var gestureCaptureOnly = false
+    private var captureOnlyAt: ((Float, Float) -> Boolean)? = null
+    private var excludedPenTouch: ((Int, Float, Float) -> Unit)? = null
+    private var excludedPointerId = MotionEvent.INVALID_POINTER_ID
     private var dashMode = false
     private var strokeWidth = 3f
     private var strokeColor = Color.BLACK
@@ -68,7 +75,9 @@ class StandardInkController : InkController {
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
-    private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+        xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC)
+    }
     private val dirty = Rect()
     private val motionDirty = Rect()
 
@@ -76,7 +85,7 @@ class StandardInkController : InkController {
 
     override fun attach(view: SurfaceView, limit: Rect, callback: StrokeCallback): Boolean {
         detach()
-        if (view.width <= 0 || view.height <= 0 || !view.holder.surface.isValid) {
+        if (view.width <= 0 || view.height <= 0 || view.holder.surface?.isValid != true) {
             Log.w(TAG, "attach rejected: invalid surface ${view.width}x${view.height}")
             return false
         }
@@ -120,6 +129,23 @@ class StandardInkController : InkController {
         dashMode = active
     }
 
+    override fun setCaptureOnly(active: Boolean) { captureOnly = active }
+    override fun setCaptureOnlyAt(decision: ((Float, Float) -> Boolean)?) { captureOnlyAt = decision }
+    override fun setExcludedPenTouch(listener: ((Int, Float, Float) -> Unit)?) { excludedPenTouch = listener }
+
+    override fun syncChrome(bitmap: Bitmap, region: Rect) {
+        val surface = view ?: return
+        ensureBacking(surface.width, surface.height)
+        val canvas = backingCanvas ?: return
+        val clipped = Rect(region)
+        if (!clipped.intersect(0, 0, surface.width, surface.height)) return
+        canvas.save()
+        canvas.clipRect(clipped)
+        canvas.drawBitmap(bitmap, region.left.toFloat(), region.top.toFloat(), bitmapPaint)
+        canvas.restore()
+        present(surface, clipped)
+    }
+
     override fun setEnabled(enabled: Boolean) {
         if (!enabled) finishAtLastPoint()
         this.enabled = enabled
@@ -152,6 +178,7 @@ class StandardInkController : InkController {
         callback = null
         isActive = false
         activePointerId = MotionEvent.INVALID_POINTER_ID
+        excludedPointerId = MotionEvent.INVALID_POINTER_ID
         strokeStarted = false
         backingBitmap = null
         backingCanvas = null
@@ -162,6 +189,15 @@ class StandardInkController : InkController {
         val startedNs = System.nanoTime()
         try {
             if (!isActive || !enabled) return false
+            if (excludedPointerId != MotionEvent.INVALID_POINTER_ID) {
+                val index = event.findPointerIndex(excludedPointerId)
+                if (index >= 0) excludedPenTouch?.invoke(event.actionMasked, event.getX(index), event.getY(index))
+                if (event.actionMasked in listOf(MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL) ||
+                    event.actionMasked == MotionEvent.ACTION_POINTER_UP && event.getPointerId(event.actionIndex) == excludedPointerId) {
+                    excludedPointerId = MotionEvent.INVALID_POINTER_ID
+                }
+                return true
+            }
             return when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> beginGesture(event)
                 MotionEvent.ACTION_MOVE -> moveGesture(event)
@@ -195,7 +231,13 @@ class StandardInkController : InkController {
 
         val x = event.getX(index)
         val y = event.getY(index)
-        if (!accepts(x, y)) return false
+        if (!accepts(x, y)) {
+            if (excludedPenTouch == null) return false
+            excludedPointerId = event.getPointerId(index)
+            excludedPenTouch?.invoke(MotionEvent.ACTION_DOWN, x, y)
+            return true
+        }
+        gestureCaptureOnly = captureOnly || captureOnlyAt?.invoke(x, y) == true
 
         activePointerId = event.getPointerId(index)
         pointCount = 0
@@ -324,6 +366,7 @@ class StandardInkController : InkController {
     }
 
     private fun drawDot(x: Float, y: Float, pressure: Float) {
+        if (gestureCaptureOnly) return
         val canvas = backingCanvas ?: return
         configurePaint(pressure)
         val radius = paint.strokeWidth / 2f
@@ -350,6 +393,7 @@ class StandardInkController : InkController {
         fromPressure: Float,
         toPressure: Float,
     ) {
+        if (gestureCaptureOnly) return
         val startedNs = System.nanoTime()
         val canvas = backingCanvas ?: return
         configurePaint((fromPressure + toPressure) / 2f)
@@ -399,7 +443,7 @@ class StandardInkController : InkController {
 
     private fun present(surfaceView: SurfaceView, region: Rect) {
         val bitmap = backingBitmap ?: return
-        if (region.isEmpty || !surfaceView.holder.surface.isValid) return
+        if (region.isEmpty || surfaceView.holder.surface?.isValid != true) return
         val startedNs = System.nanoTime()
         var canvas: Canvas? = null
         try {

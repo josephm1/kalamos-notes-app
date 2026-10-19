@@ -14,7 +14,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.PopupWindow
 import android.widget.TextView
-import com.kalamos.device.bigme.BigmePenInput
+import com.kalamos.device.api.DeviceRegistry
 import kotlin.math.max
 import kotlin.math.min
 
@@ -145,7 +145,7 @@ internal class InkToolbar(
             setTouchInterceptor { _, event ->
                 if (event.actionMasked == MotionEvent.ACTION_OUTSIDE) {
                     if (event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER &&
-                        !BigmePenInput.isPenDevice(event.deviceId)) closeSettings()
+                        !DeviceRegistry.require(activity).isPenInputDevice(event.deviceId)) closeSettings()
                     true
                 } else false
             }

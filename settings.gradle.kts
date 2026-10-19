@@ -31,7 +31,7 @@ include(":foundation:documents")
 include(":features:content-components:android")
 include(":features:rich-content:android")
 include(":features:writing:android")
-include(":devices:$kalamosDevice")
+include(":devices:standard", ":devices:bigme")
 if (kalamosDevice == "bigme") {
     include(":integrations:koreader:android-bridge")
 }

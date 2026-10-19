@@ -23,6 +23,8 @@ class BigmeDeviceProvider : DeviceProvider {
         EinkCenter.setDefaultMode()
     }
 
+    override fun isPenInputDevice(deviceId: Int): Boolean = BigmePenInput.isPenDevice(deviceId)
+
     override fun createInkController(): InkController = BigmeInkController()
 
     override fun setDefaultDisplay(context: Context) {

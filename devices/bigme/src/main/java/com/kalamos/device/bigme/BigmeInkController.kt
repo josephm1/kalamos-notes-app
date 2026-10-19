@@ -5,7 +5,7 @@ import android.graphics.Rect
 import android.os.Build
 import android.util.Log
 import android.view.SurfaceView
-import com.kalamos.device.api.ink.InkController
+import com.kalamos.device.api.ink.InkEditingController
 import com.kalamos.device.api.ink.InkDefaults
 import com.kalamos.device.api.ink.PerfCounters
 import com.kalamos.device.api.ink.PerfMetric
@@ -54,7 +54,8 @@ import java.lang.reflect.Proxy
  *            MODE_HANDWRITE=1029 MODE_RUBBER=1030 MODE_GU16=132 MODE_GC16=4
  * ```
  */
-class BigmeInkController : InkController {
+class BigmeInkController : InkEditingController {
+    override val isAvailable: Boolean get() = isBigmeDevice()
 
     override var isActive: Boolean = false
         private set
@@ -382,7 +383,7 @@ class BigmeInkController : InkController {
         exclL = left; exclT = top; exclR = right; exclB = bottom
     }
 
-    fun setExcludedPenTouch(listener: ((Int, Float, Float) -> Unit)?) {
+    override fun setExcludedPenTouch(listener: ((Int, Float, Float) -> Unit)?) {
         excludedPenTouch = listener
     }
 
@@ -394,16 +395,16 @@ class BigmeInkController : InkController {
         webEraserMode = active
     }
 
-    fun setCaptureOnly(active: Boolean) {
+    override fun setCaptureOnly(active: Boolean) {
         captureOnlyMode = active
     }
 
-    fun setCaptureOnlyAt(decision: ((Float, Float) -> Boolean)?) {
+    override fun setCaptureOnlyAt(decision: ((Float, Float) -> Boolean)?) {
         captureOnlyAt = decision
     }
 
     /** Keep daemon pen input attached while Android owns the visible edit preview. */
-    fun setOverlayVisible(visible: Boolean) {
+    override fun setOverlayVisible(visible: Boolean) {
         if (overlayVisible == visible) return
         val c = client ?: return
         val cls = clientClass ?: return
@@ -524,7 +525,7 @@ class BigmeInkController : InkController {
 
     /** Bigme's dedicated erase waveform gives a quick regional removal. Callers must follow it
      * with a settled GU16 refresh because the fast waveform can leave residual ink. */
-    fun syncOverlayRubber(bitmap: android.graphics.Bitmap, region: Rect) {
+    override fun syncOverlayRubber(bitmap: android.graphics.Bitmap, region: Rect) {
         syncOverlayWithMode(bitmap, region, true, MODE_RUBBER)
     }
 
@@ -602,7 +603,7 @@ class BigmeInkController : InkController {
 
     /** Reconcile floating chrome over the currently retained page without replacing its ink.
      * [bitmap] contains only [region], captured from the host window and composited with chrome. */
-    fun syncChrome(bitmap: android.graphics.Bitmap, region: Rect) {
+    override fun syncChrome(bitmap: android.graphics.Bitmap, region: Rect) {
         if (region.isEmpty) return
         if (!overlayVisible) return
         val c = client ?: return

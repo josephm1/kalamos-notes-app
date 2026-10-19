@@ -16,7 +16,11 @@ android {
 
 dependencies {
     api(project(":foundation:device-api"))
-    implementation(project(":devices:bigme"))
+    val device = providers.gradleProperty("kalamos.device").orElse("standard").get()
+    require(device in setOf("standard", "bigme"))
+    implementation(project(":devices:$device"))
+    testImplementation(project(":devices:bigme"))
+    testImplementation(project(":devices:standard"))
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
 }

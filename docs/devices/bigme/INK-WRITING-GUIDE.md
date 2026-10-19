@@ -1151,3 +1151,14 @@ normal content capture presents the expanded chrome. Returning to compact captur
 again. This requires no daemon restart, detach/attach, waveform or refresh-delay changes.
 Regression coverage: writing native bridge same-geometry expand/collapse and Notes runtime seam
 checks for ordered, model-only retirement. Physical panel acceptance remains user-owned.
+
+## 2026-10-19 — Generic reader provider boundary
+
+KOReader's native bridge now requests InkEditingController from the selected DeviceProvider rather
+than constructing Bigme directly. Bigme method bodies and daemon cadence/waveforms remain the same.
+Public Android controllers use capture-only editing and retained SurfaceView pixels; they require
+NativeActivity motion forwarding. Input events carry a session fence, preserve historical samples,
+and normalize incremental callbacks into a completed reader stroke. Standard Surface attachment
+waits for surfaceCreated/changed validity. Native preparation copies one provider AAR and generic
+launcher dependencies exclude hidden-API bypass. No cross-provider physical equivalence is claimed;
+owner testing remains required for coordinate alignment, gesture ownership and actual pen latency.

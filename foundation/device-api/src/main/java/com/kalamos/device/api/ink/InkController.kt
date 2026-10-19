@@ -5,9 +5,9 @@ import android.graphics.Rect
 import android.view.SurfaceView
 
 /**
- * Abstracts a low-latency ink overlay — a hardware pen pipeline that paints
- * strokes directly at the e-ink controller's native refresh rate, bypassing
- * the Android view system.
+ * Abstracts live pen capture and presentation. Standard Android uses public MotionEvents and
+ * SurfaceView composition; vendor implementations may paint through a hardware ink overlay.
+ * Hosts keep document/session ownership while the selected provider owns input/display mechanics.
  *
  * Implementations:
  * Device modules implement this contract. The shared runtime owns document/session semantics; a
