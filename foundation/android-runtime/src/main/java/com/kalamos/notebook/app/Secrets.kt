@@ -23,15 +23,15 @@ import javax.crypto.spec.GCMParameterSpec
  * migrated on first construction. The prefs file must stay excluded from Android backup —
  * see res/xml/data_extraction_rules.xml + backup_rules.xml in each app.
  */
-class Secrets(context: Context) {
+class Secrets(context: Context, cipher: SecretCipher = KeystoreCipher()) {
     private val prefs = context.getSharedPreferences("scribe_secrets", Context.MODE_PRIVATE)
 
     private val store = SecretStore(object : SecretKv {
         override fun get(key: String): String? = prefs.getString(key, null)
-        override fun put(key: String, value: String) { prefs.edit().putString(key, value).apply() }
-        override fun remove(key: String) { prefs.edit().remove(key).apply() }
+        override fun put(key: String, value: String) { check(prefs.edit().putString(key, value).commit()) { "Could not save secure storage" } }
+        override fun remove(key: String) { check(prefs.edit().remove(key).commit()) { "Could not clear secure storage" } }
         override fun keys(): Set<String> = prefs.all.keys
-    }, KeystoreCipher())
+    }, cipher)
 
     init {
         val n = store.migrateAll()
@@ -66,24 +66,26 @@ class Secrets(context: Context) {
 /**
  * AES-GCM via a non-exportable Android Keystore key. No StrongBox requirement — the Bigme
  * firmware may not expose it; the default hardware-backed (or TEE/software) Keystore is used.
- * Every failure path returns null instead of throwing: [SecretStore] then falls back cleanly
- * (set keeps legacy format, reads treat the entry as missing).
+ * Cipher failures return null: writes fail closed and reads treat the entry as missing.
+ * A missing key is created only for encryption, never as a side effect of reading ciphertext.
  */
 private class KeystoreCipher : SecretCipher {
     companion object {
         private const val ALIAS = "kalamos_secret_store_v1"
         private const val TRANSFORM = "AES/GCM/NoPadding"
+        private val KEY_LOCK = Any()
     }
 
-    private fun key(): SecretKey? = try {
+    private fun key(create: Boolean): SecretKey? = synchronized(KEY_LOCK) { try {
         val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (ks.getKey(ALIAS, null) as? SecretKey) ?: run {
+        (ks.getKey(ALIAS, null) as? SecretKey) ?: if (!create) null else run {
             val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
             gen.init(
                 KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                     .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                     .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                     .setKeySize(256)
+                    .setRandomizedEncryptionRequired(true)
                     .build()
             )
             gen.generateKey()
@@ -91,11 +93,11 @@ private class KeystoreCipher : SecretCipher {
     } catch (e: Exception) {
         Log.w("Secrets", "Keystore unavailable: ${e.javaClass.simpleName}")
         null
-    }
+    } }
 
     override fun encrypt(plain: ByteArray): Pair<ByteArray, ByteArray>? {
         return try {
-            val k = key() ?: return null
+            val k = key(create = true) ?: return null
             val c = Cipher.getInstance(TRANSFORM)
             c.init(Cipher.ENCRYPT_MODE, k)
             Pair(c.iv, c.doFinal(plain))
@@ -104,7 +106,7 @@ private class KeystoreCipher : SecretCipher {
 
     override fun decrypt(iv: ByteArray, ct: ByteArray): ByteArray? {
         return try {
-            val k = key() ?: return null
+            val k = key(create = false) ?: return null
             val c = Cipher.getInstance(TRANSFORM)
             c.init(Cipher.DECRYPT_MODE, k, GCMParameterSpec(128, iv))
             c.doFinal(ct)

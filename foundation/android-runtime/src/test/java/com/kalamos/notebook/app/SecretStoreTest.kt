@@ -73,7 +73,7 @@ class SecretStoreTest {
         cipher.available = false
         val store = SecretStore(kv, cipher)
         assertEquals(0, store.migrateAll())
-        assertEquals("legacy-value", store.value("k"))     // still usable pre-migration
+        assertNull(store.value("k")) // Unencrypted credentials cannot be used.
         cipher.available = true
         assertEquals(1, store.migrateAll())
         assertTrue(kv.map["k"]!!.startsWith(SecretStore.PREFIX))
@@ -100,17 +100,41 @@ class SecretStoreTest {
         assertFalse(storeWithNewKey.has("k"))
     }
 
-    @Test fun cipherUnavailableFallsBackWithoutLoss() {
+    @Test fun cipherUnavailableCannotPersistNewPlaintextOrOverwriteAnExistingSecret() {
         val kv = MemKv()
         val cipher = JvmCipher()
-        cipher.available = false
         val store = SecretStore(kv, cipher)
-        store.set("k", "fallback-value")            // stored legacy-format, still functional
-        assertEquals("fallback-value", store.value("k"))
+        store.set("existing", "original-secret")
+        val original = kv.map.toMap()
+        cipher.available = false
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) { store.set("new", "new-secret") }
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) { store.set("existing", "replacement") }
+        assertEquals(original, kv.map)
         cipher.available = true
-        store.migrateAll()                          // later run upgrades it
-        assertTrue(kv.map["k"]!!.startsWith(SecretStore.PREFIX))
-        assertEquals("fallback-value", store.value("k"))
+        assertEquals("original-secret", store.value("existing"))
+    }
+
+    @Test fun aLegacyKeyIsEncryptedAndVerifiedBeforeItCanBeUsed() {
+        val kv = MemKv()
+        kv.map["legacy"] = "old-token"
+        val cipher = JvmCipher()
+        val store = SecretStore(kv, cipher)
+        assertEquals("old-token", store.value("legacy"))
+        assertTrue(kv.map["legacy"]!!.startsWith(SecretStore.PREFIX))
+    }
+
+    @Test fun failedRoundTripCannotPersistCiphertextOrExposeLegacyPlaintext() {
+        val kv = MemKv()
+        kv.map["legacy"] = "old-token"
+        val cipher = object : SecretCipher {
+            override fun encrypt(plain: ByteArray) = Pair(ByteArray(12), byteArrayOf(1))
+            override fun decrypt(iv: ByteArray, ct: ByteArray): ByteArray? = null
+        }
+        val store = SecretStore(kv, cipher)
+        assertEquals(0, store.migrateAll())
+        assertNull(store.value("legacy"))
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) { store.set("new", "token") }
+        assertEquals(mapOf("legacy" to "old-token"), kv.map)
     }
 
     @Test fun clearRemovesValueAndMeta() {
@@ -143,4 +167,25 @@ class SecretStoreTest {
         assertNull(store.value("k${SecretStore.META_SUFFIX}"))
         assertEquals(0, store.migrateAll())   // meta entries never treated as legacy plaintext
     }
+    @Test fun persistenceFailureCannotReportSuccessOrReplaceTheOldCredential() {
+        val values = linkedMapOf<String, String>()
+        var fail = false
+        val kv = object : SecretKv {
+            override fun get(key: String) = values[key]
+            override fun keys() = values.keys.toSet()
+            override fun remove(key: String) { values.remove(key) }
+            override fun put(key: String, value: String) {
+                check(!fail) { "Fixture persistence failure" }
+                values[key] = value
+            }
+        }
+        val store = SecretStore(kv, JvmCipher())
+        store.set("key", "original")
+        val before = values.toMap()
+        fail = true
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) { store.set("key", "replacement") }
+        assertEquals(before, values)
+        assertEquals("original", store.value("key"))
+    }
+
 }

@@ -1,3 +1,17 @@
+## 20 October 2026 — Fail-closed API credential storage
+
+Removed the plaintext fallback when Keystore encryption is unavailable. New writes require
+verified AES-GCM ciphertext and checked synchronous preference commits; a failed write preserves
+the existing credential. Legacy plaintext migrates in place and must be encrypted/verified before
+substitution. Keystore reads do not create replacement keys; key creation is serialized, fresh IVs
+remain required. Secret preferences and their interrupted-write .bak file are excluded from both
+legacy backup and Android12+ cloud/device-transfer routes. Provider URL changes cannot inherit a
+saved credential without an explicit new key or clear operation. Keys remain native-only.
+
+JVM security regressions use real AES-GCM; Robolectric explicitly injects that cipher rather than
+relying on the removed plaintext fallback. No provider calls, device installation or physical-panel
+acceptance was performed. See .local/tidy-2026-10-20/verification.json for final checks.
+
 ## Upstream attribution and ink licensing — 19 October 2026
 
 Added prominent original-project credit and licence scope. Ink modules now use GPL-3.0-only;

@@ -13,11 +13,12 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[34],application=Application::class)
 class NotesAiModelsTest {
+    private val secure = NotesAiTestSecrets()
     @Test fun discoveryDoesNotRequireAModelOrWriteConfiguration(){
         val context=RuntimeEnvironment.getApplication()
         context.getSharedPreferences("notes-ai",0).edit().clear().commit()
         context.getSharedPreferences("scribe_secrets",0).edit().clear().commit()
-        val settings=NotesAiSettings(context)
+        val settings=secure.settings(context)
         val provider=settings.modelProvider(JSONObject().put("baseUrl","https://example.invalid/v1/").put("apiKey","fixture-key"))
         val request=NotesAiModels.request(provider)
         assertEquals("GET",request.method);assertNull(request.body)

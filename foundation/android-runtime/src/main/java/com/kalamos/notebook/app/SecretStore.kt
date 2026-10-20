@@ -18,10 +18,9 @@ import java.util.Base64
  * interrupted migration therefore leaves any given entry either fully plaintext (picked up on
  * the next run) or fully encrypted — never a broken half. Migration is idempotent.
  *
- * Cipher unavailability (firmware without a working Keystore): set() falls back to the legacy
- * plaintext format rather than losing functionality — the same trade the pre-AFK-S2 code made
- * unconditionally — and a later run with a working cipher migrates it. Tampered or undecryptable
- * ciphertext is treated as MISSING (the user re-enters the key), never surfaced as bytes.
+ * Encryption or persistence failure must never create a plaintext entry. Legacy plaintext
+ * remains available only for a later migration attempt, not for credential substitution.
+ * Tampered or undecryptable ciphertext is treated as missing.
  */
 interface SecretCipher {
     /** Returns (iv, ciphertext), or null when encryption is unavailable. */
@@ -71,7 +70,10 @@ class SecretStore(private val kv: SecretKv, private val cipher: SecretCipher) {
     }
 
     fun set(key: String, value: String) {
-        kv.put(key, encode(value) ?: value)   // cipher unavailable → legacy-format fallback
+        val encrypted = encode(value)
+            ?: error("Secure storage unavailable. Your API key was not saved; try again.")
+        check(decode(encrypted) == value) { "Could not verify secure storage. Your API key was not saved." }
+        kv.put(key, encrypted)
         touchMeta(key)
     }
 
@@ -79,7 +81,13 @@ class SecretStore(private val kv: SecretKv, private val cipher: SecretCipher) {
     fun value(key: String): String? {
         if (isMeta(key)) return null
         val stored = kv.get(key) ?: return null
-        val plain = decode(stored)
+        val encrypted = if (stored.startsWith(PREFIX)) stored else {
+            val migrated = encode(stored) ?: return null
+            if (decode(migrated) != stored) return null
+            kv.put(key, migrated)
+            migrated
+        }
+        val plain = decode(encrypted)
         return if (plain.isNullOrEmpty()) null else plain
     }
 

@@ -6,9 +6,9 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 
 /** Notes-owned configuration. Credential values never return to JavaScript or enter jobs/bundles. */
-class NotesAiSettings(context: Context) {
+class NotesAiSettings(context: Context, private val secretFactory: () -> Secrets = { Secrets(context) }) {
     private val prefs = context.getSharedPreferences("notes-ai", Context.MODE_PRIVATE)
-    private val secrets by lazy { Secrets(context) }
+    private val secrets by lazy(secretFactory)
     data class Provider(val baseUrl: String, val model: String, val key: String, val thinking: String = DEFAULT_THINKING) {
         init { require(thinking in THINKING_LEVELS) { "Invalid thinking level" } }
         val chatUrl get() = baseUrl.trimEnd('/') + "/chat/completions"
@@ -23,6 +23,10 @@ class NotesAiSettings(context: Context) {
         val thinking = input.optString("thinking", prefs.getString("thinking", DEFAULT_THINKING))
         require(thinking in THINKING_LEVELS) { "Choose a valid thinking level" }
         val key = apiKey(input.optString("apiKey"))
+        require(url == prefs.getString("baseUrl", DEFAULT_URL) || key.isNotBlank() ||
+            input.optBoolean("clearKey") || !secrets.has(KEY)) {
+            "Enter an API key for the changed provider, or clear the saved key"
+        }
         if (input.optBoolean("clearKey")) secrets.clear(KEY)
         else if (key.isNotBlank()) secrets.set(KEY, key)
         check(prefs.edit().putString("baseUrl", url).putString("model", model).putString("thinking", thinking).commit()) { "Could not save AI settings" }

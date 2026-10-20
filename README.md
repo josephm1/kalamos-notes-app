@@ -42,7 +42,12 @@ Read `AGENTS.md`, `RULES.md` and `docs/devices/bigme/INK-WRITING-GUIDE.md` befor
 
 MyScript is no longer used. The SDK, certificate and language resources have been removed;
 this build does not require a MyScript account or licence. Image-to-Markdown AI formatting
-uses the provider configured in Notes. API keys are entered on device and stored locally.
+uses the provider configured in Notes. API keys stay in native storage, encrypted with
+AES-256-GCM using a non-exportable Android Keystore key. Secret preferences and interrupted-write
+backups are excluded from cloud backup and device transfer. Encryption or persistence failures
+reject a new key instead of saving plaintext. Legacy plaintext is encrypted and verified before use;
+if secure storage is unavailable it remains unused for a later migration attempt. Changing provider
+URLs requires a new key or clearing the saved key.
 User notebooks, device captures, build outputs and signing keys are excluded from source.
 
 ## Licence and downloads
