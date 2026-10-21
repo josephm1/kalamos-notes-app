@@ -443,7 +443,9 @@ export function createApp(host: HTMLElement, opts: CreateAppOptions): VanillaApp
     };
     schedulePersist(docState);
     selectedId = null;
-    renderReading();
+    // Direct Notes keeps its existing workspace authoritative. A delivered native draft is
+    // persistence only: rebuilding hidden reader chrome still mutates the live WebView at idle.
+    if (!opts.directWorkspace) renderReading();
   }
 
   function applySnapshot(snap: HistorySnap) {

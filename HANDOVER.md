@@ -1,3 +1,20 @@
+## 21 October 2026 — Delayed erase-flash candidate: per-client idle recommit
+
+Owner still saw a whole-panel flash after the local erase completed. The captured reproduction
+issued one bounded GU16/GC16 erase transaction, no later JS refresh, no daemon detach/reattach,
+and an ordinary model-only idle save around 2.5 seconds later. Android screenshots/explicit app
+refresh logs cannot certify physical-panel behavior. Firmware inspection confirmed
+HandwrittenClient.setRecommitEnabled(boolean, int delay, int mode) forwards to the service with
+that registered client's ID. Bigme now explicitly disables this independent idle replay immediately
+after connect, before input/overlay activation; an absent optional API logs a warning and retains
+writing. It does not change package policy, waveforms, the capture queue or the existing 180ms
+input gate. Physical acceptance of the delayed-flash fix remains pending the owner's next run.
+
+Also removed hidden reader rendering from direct-editor commits. An integration regression exercises
+actual erase, native idle-save dispatch and app persistence: erased ink and image references save
+while every editor DOM node remains unchanged. This failed before the direct-host guard because
+idle saving rewrote hidden filename DOM. Reader-mode commits retain their reader refresh.
+
 ## 21 October 2026 — Direct Select beside Lasso
 
 The pointer button selects words or the topmost page object by pen contact using the existing

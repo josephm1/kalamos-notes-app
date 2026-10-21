@@ -3,6 +3,8 @@ import { fingerprintOf } from "../documents/fingerprint";
 import type { DocStore, PersistState } from "../documents/store";
 import { DEFAULT_PREFERENCES } from "../storage/preferences";
 import { createApp } from "./main";
+import { PenWorkspace } from "./penWorkspace";
+import { Write2Native } from "../kalamos/native";
 
 beforeAll(() => {
   (HTMLCanvasElement.prototype as unknown as { getContext: () => unknown }).getContext = () => ({
@@ -249,4 +251,36 @@ it('turns existing sheets with direct arrows and horizontal finger swipes withou
   (host.querySelector('[data-action="pages"]') as HTMLButtonElement).click();
   touch('pointerdown',450);touch('pointerup',300);expect(change).not.toHaveBeenCalled();
   app.destroy();
+});
+
+it('idle native save keeps the complete direct-editor DOM unchanged while persisting erased ink and an image', async()=>{
+ const host=document.createElement('div');document.body.append(host);
+ const persist=vi.fn(async (_state:PersistState)=>{});
+ const native=new Write2Native();let workspace!:PenWorkspace;
+ const app=createApp(host,{store:store(persist),chrome:'kalamos',directWorkspace:true,
+  nativeHooks:{native:true,onWorkspaceOpen:ws=>{workspace=ws;}}});
+ try {
+  await app.openDocument({docId:'quiet-save',name:'Quiet save',source:'\u200b',fingerprint:fingerprintOf('\u200b'),handle:null});
+  // The loaded image reference is ordinary page data; an idle save must not repaint any chrome.
+  const image={id:'photo',kind:'image',x:120,y:80,width:100,height:80,color:'#000',strokeWidth:1,
+   attachment:{id:'a'.repeat(64),name:'Photo.jpg',mime:'image/jpeg',width:200,height:160}};
+  (workspace as any).doc={...workspace.reflowDoc,pageObjects:[image]};
+  workspace.applyNativeWriteStroke(Array.from({length:8},(_,i)=>({x:20,y:10+i*3,t:i*4,pressure:.5})),false);
+  const point=workspace.getNativeInkStrokes()[0].pts[4];
+  const scrub=Array.from({length:7},(_,i)=>({x:point.x+(i%2?45:-45),y:point.y-6+i*2,t:i*4,pressure:.5}));
+  expect(workspace.applyNativeWriteStroke(scrub,false)).not.toBeNull();
+  workspace.reconcileNativeCommand();expect(workspace.getNativeInkStrokes()).toHaveLength(0);
+  await Promise.resolve();
+  const changes:MutationRecord[]=[];
+  const mutation=new MutationObserver(records=>changes.push(...records));mutation.observe(host,{subtree:true,childList:true,attributes:true,characterData:true});
+  const before=host.innerHTML;
+  Object.assign(native,{ws:workspace,attached:true});
+  native.onNativeSaveRequested();await Promise.resolve();await Promise.resolve();
+  changes.push(...mutation.takeRecords());mutation.disconnect();
+  expect(persist).toHaveBeenCalledOnce();
+  expect(persist.mock.calls[0][0].sidecar.inkRuns).toEqual([]);
+  expect(persist.mock.calls[0][0].sidecar.pageObjects).toEqual([image]);
+  expect(app.isEditing()).toBe(true);expect(host.innerHTML).toBe(before);
+  expect(changes.map(r=>({type:r.type,target:(r.target as HTMLElement).className}))).toEqual([]);
+ }finally{app.destroy();}
 });

@@ -267,6 +267,22 @@ Regression coverage in `src/kalamos/native.test.ts` checks a nested layout callb
 partial capture and absence of another presentation after idle. Physical panel acceptance remains
 user-owned; screenshots cannot certify removal of retained e-ink ghosts.
 
+### Per-client delayed recommit (21 October 2026; physical acceptance pending)
+
+A user-confirmed delayed panel flash reproduced after one bounded erase capture with no second
+JS/native refresh request or session reconnection. The installed framework exposes
+`HandwrittenClient.setRecommitEnabled(enabled, delay, mode)`, forwarding the registered client ID
+to `IHandwrittenService.setRecommitEnabledForClient`. Configure this optional policy once after
+connect and before activating consumers: the host already owns page presentation and regional
+GC16 cleanup, so an independent idle overlay replay is unwanted. Disable it for that client only;
+do not change global/package modes or remove input gating to work around a delayed flash.
+Older firmware without the setter keeps writing and reports policy unavailability. Automated tests
+verify the scoped request and unchanged input; the owner must verify actual panel behavior.
+
+Passive native saves also bypass the direct editor's hidden reader renderer. Saving a delivered
+model must cause no DOM mutation, native flush, mode switch or content capture. The integration
+regression includes an erased word and an image reference, and checks persistence and the full DOM.
+
 ### 5.4 Fast ink commits versus clean model refreshes
 
 The two native refresh styles serve different purposes:

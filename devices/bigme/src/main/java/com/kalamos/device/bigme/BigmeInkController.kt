@@ -211,6 +211,13 @@ class BigmeInkController : InkEditingController {
                 return false
             }
 
+            // Configure the service before the first input pause/activation. The framework exposes
+            // an independent idle recommit timer; it can repaint the full panel after our bounded
+            // erase has already completed, without another renderInk/snapshot request from JS.
+            // Older firmware may omit this optional policy; retain ordinary writing in that case.
+            runCatching { disableHandwrittenRecommit(cls, c) }
+                .onSuccess { Log.i(TAG, "Requested per-client delayed recommit disabled") }
+                .onFailure { Log.w(TAG, "Delayed recommit policy unavailable: ${it.message}") }
             cls.getMethod("setInputEnabled", Boolean::class.javaPrimitiveType).invoke(c, false)
             cls.getMethod("setOverlayEnabled", Boolean::class.javaPrimitiveType).invoke(c, false)
             cls.getMethod("setBlendEnabled", Boolean::class.javaPrimitiveType).invoke(c, false)
