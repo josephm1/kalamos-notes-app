@@ -267,7 +267,7 @@ Regression coverage in `src/kalamos/native.test.ts` checks a nested layout callb
 partial capture and absence of another presentation after idle. Physical panel acceptance remains
 user-owned; screenshots cannot certify removal of retained e-ink ghosts.
 
-### Per-client delayed recommit (21 October 2026; physical acceptance pending)
+### Per-client delayed recommit (21 October 2026; owner verified)
 
 A user-confirmed delayed panel flash reproduced after one bounded erase capture with no second
 JS/native refresh request or session reconnection. The installed framework exposes
@@ -277,7 +277,9 @@ connect and before activating consumers: the host already owns page presentation
 GC16 cleanup, so an independent idle overlay replay is unwanted. Disable it for that client only;
 do not change global/package modes or remove input gating to work around a delayed flash.
 Older firmware without the setter keeps writing and reports policy unavailability. Automated tests
-verify the scoped request and unchanged input; the owner must verify actual panel behavior.
+verify the scoped request and unchanged input. After installing the matching Bigme build, the owner
+confirmed that the reported delayed scribble-erase flash stopped. Keep this per-client policy and
+the existing input gate; other firmware still requires its own physical acceptance.
 
 Passive native saves also bypass the direct editor's hidden reader renderer. Saving a delivered
 model must cause no DOM mutation, native flush, mode switch or content capture. The integration

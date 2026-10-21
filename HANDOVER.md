@@ -1,4 +1,4 @@
-## 21 October 2026 — Delayed erase-flash candidate: per-client idle recommit
+## 21 October 2026 — Delayed erase flash resolved: per-client idle recommit
 
 Owner still saw a whole-panel flash after the local erase completed. The captured reproduction
 issued one bounded GU16/GC16 erase transaction, no later JS refresh, no daemon detach/reattach,
@@ -8,7 +8,9 @@ HandwrittenClient.setRecommitEnabled(boolean, int delay, int mode) forwards to t
 that registered client's ID. Bigme now explicitly disables this independent idle replay immediately
 after connect, before input/overlay activation; an absent optional API logs a warning and retains
 writing. It does not change package policy, waveforms, the capture queue or the existing 180ms
-input gate. Physical acceptance of the delayed-flash fix remains pending the owner's next run.
+input gate. After the data-preserving installation, the owner confirmed that the delayed flash
+was gone on the connected Bigme. This acceptance covers the reported scribble-erase regression;
+it does not establish compatibility with other firmware versions.
 
 Also removed hidden reader rendering from direct-editor commits. An integration regression exercises
 actual erase, native idle-save dispatch and app persistence: erased ink and image references save
