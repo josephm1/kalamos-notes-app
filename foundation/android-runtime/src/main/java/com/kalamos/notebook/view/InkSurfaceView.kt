@@ -679,7 +679,10 @@ class InkSurfaceView @JvmOverloads constructor(
         val needSuspend = controller != null && controller.ownsSurface && controller.isActive
         if (needSuspend) controller?.setEnabled(false)
         try {
-            val canvas = (if (dirty != null) holder.lockCanvas(dirty) else holder.lockCanvas()) ?: return
+            // Surface.lockCanvas treats its Rect as in/out and may expand it to the full buffer.
+            // That buffer damage must not mutate the caller's e-ink presentation/erase bounds.
+            // Draw the complete retained bitmap as usual so even expanded buffer damage is valid.
+            val canvas = (if (dirty != null) holder.lockCanvas(Rect(dirty)) else holder.lockCanvas()) ?: return
             try {
                 canvas.drawBitmap(bmp, 0f, 0f, null)
             } finally {
