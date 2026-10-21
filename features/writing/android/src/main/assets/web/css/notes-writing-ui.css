@@ -79,7 +79,7 @@
   width:26px; height:26px; fill:none; stroke:#000; stroke-width:1.7;
 }
 #kalamos-write-workspace-root .v-modal.toolbar-mode-full > .v-modal-header .v-modal-title {
-  font-size:16px; font-weight:500; max-width:calc(100vw - 250px);
+  font-size:16px; font-weight:500; max-width:calc(100vw - 294px);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 #kalamos-write-workspace-root .v-modal.toolbar-mode-full .pen-workspace { padding:8px 10px 20px 60px; }
@@ -92,7 +92,7 @@
   padding:5px; border:0; background:#fff; color:#000; pointer-events:auto;
 }
 #kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-core {
-  position:fixed; left:calc(100% - 152px); right:6px; top:0; height:47px;
+  position:fixed; left:calc(100% - 196px); right:6px; top:0; height:47px;
   display:flex; align-items:center; justify-content:flex-end; gap:0;
   padding:0; border:0; background:#fff; pointer-events:auto;
 }
@@ -106,7 +106,7 @@
 #kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-more-rail {
   position:fixed; left:6px; top:64px; bottom:auto;
   display:flex; flex-direction:column; align-items:stretch; gap:0;
-  width:48px; height:706px; max-height:none; padding:0;
+  width:48px; height:662px; max-height:none; padding:0;
   border:1px solid #000; border-radius:6px; background:#fff; overflow:hidden;
   pointer-events:auto; scrollbar-width:none;
 }
@@ -116,12 +116,11 @@
 #kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-more-rail button::after { display:none; }
 #kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-handle { display:none; }
 #kalamos-write-workspace-root .tool-pill.toolbar-all-tools .toolbar-more-rail > [data-action=spacing],
-#kalamos-write-workspace-root .tool-pill.toolbar-all-tools .toolbar-more-rail > [data-action=undo],
-#kalamos-write-workspace-root .tool-pill.toolbar-all-tools .toolbar-more-rail > [data-action=page-add] { border-top:1px solid #999; }
+#kalamos-write-workspace-root .tool-pill.toolbar-all-tools .toolbar-more-rail > [data-action=undo] { border-top:1px solid #999; }
 #kalamos-write-workspace-root .tool-pill.selection-active .toolbar-secondary { display:flex; }
 #kalamos-write-workspace-root .tool-pill::-webkit-scrollbar,
 #kalamos-write-workspace-root .tool-pill > *::-webkit-scrollbar { display:none; }
-@media(max-height:769px) {
+@media(max-height:725px) {
   #kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-more-rail {
     display:grid; grid-template-columns:repeat(2,46px); grid-auto-rows:44px; width:94px; height:354px;
   }

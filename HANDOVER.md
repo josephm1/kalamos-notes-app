@@ -1,3 +1,19 @@
+## 21 October 2026 — Direct attachment picking, image grips and local erase damage
+
+Attach menu rows accept matching pen releases and suppress the same contact's compatibility click.
+Image/audio/file open Android's picker directly, without a second status panel. Link opens URL entry.
+Cancellation restores the small menu under the same dialog owner. Selected images have eight grips:
+corners retain the current ratio and opposite corner; edge midpoints change one axis. Centre drag
+moves the image; Undo/save and SVG/canvas thumbnail/export preserve its resulting dimensions.
+Add Page now precedes Previous in the expanded header, reducing the left rail by one item.
+
+Surface.lockCanvas(Rect) can enlarge its in/out buffer-damage rectangle. commitPage now passes a
+copy, keeping the caller's e-ink presentation and erase-clean bounds independent of buffer damage.
+The native regression reproduces enlargement to the full surface and verifies a local refresh and
+cleanup with image content retained. Unchanged image DOM nodes also remain mounted during unrelated
+writing/erase reconciliation, with explicit object stacking instead of detach/reinsert on every pass.
+No daemon reconnect, waveform, capture queue or scheduling changes. Physical acceptance is owner-run.
+
 ## 21 October 2026 — Compact AI action and page attachments
 
 Compact Notes replaces Zoom with the existing Format with AI action without adding a row. Zoom

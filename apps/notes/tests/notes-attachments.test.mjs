@@ -80,3 +80,29 @@ test('closing or replacing the page during checkpoint cannot open a stale menu',
   assert.equal(t.w.document.querySelector('[role=dialog]'),null);assert.equal(t.inserted.length,0)
  }finally{t.dom.window.close()}
 })
+
+function pen(w, target, type) {
+ const event=new w.MouseEvent(type,{bubbles:true,cancelable:true})
+ Object.defineProperties(event,{pointerType:{value:'pen'},pointerId:{value:7}})
+ target.dispatchEvent(event)
+}
+for (const label of ['Image','Audio','File']) test(`${label} opens picker directly on pen release without a second click`,async()=>{
+ const t=setup({reqId:'picker'});try{
+  await t.w.KalamosNotesAttachments.open('one');const button=t.button(label)
+  pen(t.w,button,'pointerdown');pen(t.w,button,'pointerup');await settle()
+  button.click();await settle()
+  assert.equal(t.calls.length,1);assert.equal(t.calls[0].method,'notes.attachments.pick')
+  assert.equal(t.calls[0].args.kind,label.toLowerCase())
+  assert.equal(t.w.document.querySelector('.notes-attachment-menu').hidden,true)
+  assert.equal(t.w.document.querySelector('[role=status]').textContent,'')
+ }finally{t.dom.window.close()}
+})
+test('pen Link tap opens URL entry directly and a cancelled pen does nothing',async()=>{
+ const t=setup();try{
+  await t.w.KalamosNotesAttachments.open('one');const link=t.button('Link')
+  pen(t.w,link,'pointerdown');pen(t.w,link,'pointercancel');pen(t.w,link,'pointerup');await settle()
+  assert.equal(t.w.document.querySelector('[aria-label="Link URL"]'),null)
+  pen(t.w,link,'pointerdown');pen(t.w,link,'pointerup');await settle()
+  assert.ok(t.w.document.querySelector('[aria-label="Link URL"]'));assert.equal(t.calls.length,0)
+ }finally{t.dom.window.close()}
+})

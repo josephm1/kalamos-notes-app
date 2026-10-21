@@ -1,5 +1,6 @@
 import {afterEach,beforeAll,beforeEach,expect,it,vi} from 'vitest';
 import {PenWorkspace} from './penWorkspace';
+import {Write2Native} from '../kalamos/native';
 import {DEFAULT_PREFERENCES} from '../storage/preferences';
 import {parseMarkdown} from '../markdown/parse';
 import {createEmptySidecar,validateSidecar} from '../sidecar/schema';
@@ -44,7 +45,7 @@ it('pen move/resize preserves image aspect and Undo restores resized/deleted obj
  const move=host.querySelector('[aria-label="Move attachment"]')!;
  pointer(move,'pointerdown',0,0);pointer(move,'pointermove',-10,40);pointer(move,'pointerup',-10,40);
  expect(ws.reflowDoc.pageObjects![0]).toMatchObject({x:before.x-10,y:before.y+40});
- const resize=host.querySelector('[aria-label="Resize attachment"]')!;
+ const resize=host.querySelector('[data-handle="se"]')!;
  pointer(resize,'pointerdown',0,0);pointer(resize,'pointermove',-70,-30);pointer(resize,'pointerup',-70,-30);
  const resized=ws.reflowDoc.pageObjects![0];expect(resized.width).toBeLessThan(before.width);expect(resized.width/resized.height).toBeCloseTo(2);
  host.querySelector<HTMLButtonElement>('[data-action="undo"]')!.click();expect(ws.reflowDoc.pageObjects![0].width).toBe(before.width);
@@ -116,6 +117,51 @@ it('native audio pen contact activates once, saves no dot, and periodic time upd
 it('ordinary writing retains the already-decoded image DOM instead of rebuilding it',async()=>{
  const {ws,host}=setup();await ws.addAttachment({kind:'image',attachment:asset});ws.setActiveTool('write');
  const node=host.querySelector('[data-page-object]');
+ const mutations:MutationRecord[]=[];
+ const observer=new MutationObserver(records=>mutations.push(...records));observer.observe(ws.containerElement,{childList:true});
  ws.applyNativeWriteStroke([{x:12,y:10,t:0,pressure:.5},{x:22,y:15,t:1,pressure:.5}],true);
  expect(host.querySelector('[data-page-object]')).toBe(node);
+ mutations.push(...observer.takeRecords());observer.disconnect();
+ expect(mutations.some(record=>[...record.addedNodes,...record.removedNodes].includes(node!))).toBe(false);
+});
+
+it('offers eight pen grips, axis-only edge resizing, cancellation and stretched export',async()=>{
+ const {ws,host}=setup();await ws.addAttachment({kind:'image',attachment:asset});
+ expect(host.querySelectorAll('.rw-image-handle')).toHaveLength(8);
+ const before={...ws.reflowDoc.pageObjects![0]};
+ let edge=host.querySelector('[data-handle="e"]')!;
+ pointer(edge,'pointerdown',0,0);pointer(edge,'pointermove',-60,90);pointer(edge,'pointerup',-60,90);
+ expect(ws.reflowDoc.pageObjects![0]).toMatchObject({x:before.x,y:before.y,width:before.width-60,height:before.height});
+ expect(ws.exportSvgPages().join('')).toContain('preserveAspectRatio="none"');
+ const stretched={...ws.reflowDoc.pageObjects![0]};edge=host.querySelector('[data-handle="n"]')!;
+ pointer(edge,'pointerdown',0,0);pointer(edge,'pointermove',-20,30);pointer(edge,'pointercancel',-20,30);
+ expect(ws.reflowDoc.pageObjects![0]).toEqual(stretched);
+ host.querySelector<HTMLButtonElement>('[data-action="undo"]')!.click();
+ expect(ws.reflowDoc.pageObjects![0]).toEqual(stretched);
+ host.querySelector<HTMLButtonElement>('[data-action="undo"]')!.click();
+ expect(ws.reflowDoc.pageObjects![0]).toEqual(before);
+});
+
+it('scribble on an image page keeps one bounded native capture and leaves the image mounted',async()=>{
+ const {ws,host}=setup();await ws.addAttachment({kind:'image',attachment:asset});ws.setActiveTool('write');
+ ws.applyNativeWriteStroke(Array.from({length:8},(_,i)=>({x:10,y:10+i*3,t:i*4,pressure:.5})),true);
+ const stroke=ws.getNativeInkStrokes()[0],point=stroke.pts[4];
+ const node=host.querySelector('[data-page-object]');
+ const mutation=new MutationObserver(()=>{});mutation.observe(ws.containerElement,{childList:true});
+ const bridge={renderInk:vi.fn(),setInkEnabled:vi.fn(),snapshotContent:vi.fn(),snapshotContentPartial:vi.fn(),attachInkBox:vi.fn()};
+ vi.stubGlobal('Bridge',bridge);vi.useFakeTimers();
+ try {
+  const native=new Write2Native();
+  Object.assign(native,{ws,attached:true,dpr:1,boxL:0,boxT:0,boxR:320,boxB:700,boxW:320,boxH:700});
+  (ws as any).props.onLayoutChanged=native.hooks().onWorkspaceLayout;
+  const scrub=Array.from({length:7},(_,i)=>[point.x+(i%2?45:-45),point.y-6+i*2,.5]);
+  native.onNoteStrokes([scrub]);expect(ws.getNativeInkStrokes()).toHaveLength(0);
+  vi.advanceTimersByTime(600);
+  expect(bridge.snapshotContentPartial).toHaveBeenCalledOnce();expect(bridge.snapshotContent).not.toHaveBeenCalled();
+  const capture=bridge.snapshotContentPartial.mock.calls[0];expect(capture.slice(0,4)).toEqual([0,0,320,700]);
+  expect(capture[6]-capture[4]).toBeLessThan(150);expect(capture[7]-capture[5]).toBeLessThan(100);
+  expect(JSON.parse(bridge.renderInk.mock.calls[0][0])).toHaveProperty('eraseRect');
+  expect(bridge.attachInkBox).not.toHaveBeenCalled();expect(host.querySelector('[data-page-object]')).toBe(node);
+  expect(mutation.takeRecords().some(r=>[...r.addedNodes,...r.removedNodes].includes(node!))).toBe(false);
+ } finally {mutation.disconnect();vi.useRealTimers();}
 });

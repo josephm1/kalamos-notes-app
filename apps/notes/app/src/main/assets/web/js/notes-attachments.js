@@ -55,7 +55,20 @@
     }
     function button(label, run, parent = body) {
       const item = document.createElement('button'); item.type = 'button'; item.textContent = label
-      item.onclick = () => { if (!waiting) void Promise.resolve().then(run).catch(error => { status.textContent = error.message }) }
+      let pen = null, penActivated = false
+      const activate = () => { if (!waiting) void Promise.resolve().then(run).catch(error => { status.textContent = error.message }) }
+      item.addEventListener('pointerdown', event => {
+        event.stopPropagation(); penActivated = false
+        pen = event.pointerType === 'pen' && !item.disabled ? event.pointerId : null
+      })
+      item.addEventListener('pointercancel', () => { pen = null })
+      item.addEventListener('pointerleave', () => { pen = null })
+      item.addEventListener('pointerup', event => {
+        if (pen !== event.pointerId || event.pointerType !== 'pen') return
+        pen = null; penActivated = true; event.preventDefault(); event.stopPropagation(); activate()
+      })
+      item.addEventListener('keydown', () => { penActivated = false })
+      item.addEventListener('click', () => { if (!penActivated) activate() })
       parent.append(item); return item
     }
     button('Cancel', () => close(), footer)
@@ -65,7 +78,7 @@
     }
     for (const [kind, label] of [['image', 'Image'], ['audio', 'Audio'], ['file', 'File']]) {
       button(label, async () => {
-        busy(true); status.textContent = 'Choose a file…'
+        busy(true); status.textContent = ''; panel.hidden = true
         try {
           const value = await call('notes.attachments.pick', {kind})
           if (!overlay.isConnected) return
@@ -73,11 +86,11 @@
           status.textContent = 'Adding attachment…'
           await editor().addAttachment(context, value)
           busy(false); await close()
-        } finally { busy(false) }
+        } finally { panel.hidden = false; busy(false) }
       })
     }
     button('Link', () => {
-      heading.textContent = 'Add link'; panel.classList.add('link-editor'); panel.setAttribute('aria-label','Add link'); body.replaceChildren()
+      status.textContent = ''; heading.textContent = 'Add link'; panel.classList.add('link-editor'); panel.setAttribute('aria-label','Add link'); body.replaceChildren()
       const name = document.createElement('input'); name.type = 'text'; name.maxLength = 240; name.placeholder = 'Title (optional)'
       name.setAttribute('aria-label', 'Link title')
       const url = document.createElement('input'); url.type = 'url'; url.maxLength = 4096; url.placeholder = 'https://…'

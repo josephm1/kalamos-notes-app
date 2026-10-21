@@ -548,3 +548,5 @@ input, textarea, [contenteditable=true] { -webkit-user-select:text; user-select:
 .notes-attachment-menu.link-editor .notes-attachment-footer { display:flex; justify-content:space-between; }
 .notes-attachment-menu.link-editor .notes-attachment-options { gap:8px; padding:10px; }
 .notes-attachment-options > input { box-sizing:border-box; width:100%; min-height:40px; padding:7px; border:1px solid #000; background:#fff; color:#000; font-family:inherit; font-size:16px; }
+
+.notes-attachment-menu[hidden] { display:none; }

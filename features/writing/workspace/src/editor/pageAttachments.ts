@@ -86,7 +86,7 @@ export class AttachmentImages {
 export function attachmentSvg(object: PageObject, imageSource?: string): string {
   const escape = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]!));
   if (object.kind === 'image' && imageSource && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(imageSource))
-    return `<svg x="${object.x}" y="${object.y}" width="${object.width}" height="${object.height}" viewBox="0 0 ${object.width} ${object.height}"><rect width="${object.width}" height="${object.height}" fill="#fff"/><image href="${imageSource}" width="${object.width}" height="${object.height}" preserveAspectRatio="xMidYMid meet"/></svg>`;
+    return `<svg x="${object.x}" y="${object.y}" width="${object.width}" height="${object.height}" viewBox="0 0 ${object.width} ${object.height}"><rect width="${object.width}" height="${object.height}" fill="#fff"/><image href="${imageSource}" width="${object.width}" height="${object.height}" preserveAspectRatio="none"/></svg>`;
   if (object.kind === 'audio') {
     const time = `0:00 / ${object.attachment?.durationMs ? audioTime(object.attachment.durationMs) : '--:--'}`;
     return `<svg x="${object.x}" y="${object.y}" width="${object.width}" height="${object.height}" viewBox="0 0 ${object.width} ${object.height}"><rect x="1" y="1" rx="4" width="${object.width-2}" height="${object.height-2}" fill="#fff" stroke="#000"/><path d="M16 ${object.height/2-8}l12 8-12 8z" fill="#000"/><text x="44" y="20" font-family="sans-serif" font-size="14" fill="#000">${escape(attachmentLabel(object))}</text><text x="44" y="38" font-family="sans-serif" font-size="12" fill="#000">${time}</text></svg>`;
@@ -97,10 +97,8 @@ export function attachmentSvg(object: PageObject, imageSource?: string): string 
 
 export function drawAttachment(ctx: CanvasRenderingContext2D, object: PageObject, image?: HTMLImageElement) {
   if (object.kind === 'image' && image) {
-    const scale = Math.min(object.width/image.naturalWidth, object.height/image.naturalHeight);
-    const w = image.naturalWidth*scale, h = image.naturalHeight*scale;
     ctx.fillStyle='#fff';ctx.fillRect(object.x,object.y,object.width,object.height);
-    ctx.drawImage(image, object.x+(object.width-w)/2, object.y+(object.height-h)/2, w, h); return;
+    ctx.drawImage(image, object.x, object.y, object.width, object.height); return;
   }
   ctx.save(); ctx.fillStyle = '#fff'; ctx.fillRect(object.x, object.y, object.width, object.height);
   ctx.strokeStyle = '#000'; ctx.strokeRect(object.x, object.y, object.width, object.height);

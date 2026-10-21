@@ -1,3 +1,4 @@
+import { IMAGE_HANDLES, resizeImage, type ImageHandle } from "../editor/imageResize";
 import { audioCard, updateAudioCard } from "./audioCard";
 import { AttachmentImages, isAttachmentObject, validPageAttachment, drawAttachment, type Attachment, type PageAttachment, type AudioStatus } from "../editor/pageAttachments";
 import { horizontalAnchor, horizontalSpace, verticalSpace, condenseSpace, constrainTranslation, type SpatialAtom, type SpatialPlan } from "../reflow/spatialLayout";
@@ -3794,11 +3795,11 @@ export class PenWorkspace {
     textBtn.dataset.label = "Text";
     rail.appendChild(textBtn);
     if (this.props.pageTools) {
-      for (const [action,label,icon,fallback] of [[-1,"Previous page","prev","‹"],[1,"Next page","next","›"],["add","Add page","newNote","+"]] as const) {
+      for (const [action,label,icon,fallback] of [["add","Add page","newNote","+"],[-1,"Previous page","prev","‹"],[1,"Next page","next","›"]] as const) {
         const pageBtn = btn(fallback,icon,label,()=>this.afterNativeFlush(()=>this.props.pageTools!.change(action)),label,`page-${action}`);
         pageBtn.dataset.label = action === -1 ? "Previous" : action === 1 ? "Next" : "Add page"; pageBtn.classList.add("toolbar-page-button");
         pageBtn.disabled = action === -1 ? this.props.pageTools.index === 0 : action === 1 ? this.props.pageTools.index === this.props.pageTools.count-1 : false;
-        if (action === "add") { pageBtn.classList.add("toolbar-more"); rail.appendChild(pageBtn); }
+        if (action === "add" && !this.props.notebookToolbar) { pageBtn.classList.add("toolbar-more"); rail.appendChild(pageBtn); }
         else {
           core.appendChild(pageBtn);
           if(action===-1){
@@ -3874,7 +3875,7 @@ export class PenWorkspace {
       }
       const navigation = compactCore.filter(el => el.classList.contains("toolbar-page-button") || el.classList.contains("toolbar-page-overview"));
       const tools = [writeBtn, ...colorSlots, eraseBtn, selectBtn, spacingBtn, magnifyBtn, textBtn, shapes,
-        keyboardBtn, ...compactRail.filter(el => (el as HTMLElement).dataset.action?.startsWith("document-action")), undoBtn, redoBtn, ...compactRail.filter(el => (el as HTMLElement).dataset.action === "page-add"),
+        keyboardBtn, ...compactRail.filter(el => (el as HTMLElement).dataset.action?.startsWith("document-action")), undoBtn, redoBtn,
         this.copyBtn!, this.deleteBtn!, this.convertBtn!];
       for (const tool of [writeBtn, eraseBtn, selectBtn]) {
         tool.dataset.label = tool === writeBtn ? "Pen" : tool === eraseBtn ? "Eraser" : "Select";
@@ -4087,15 +4088,19 @@ export class PenWorkspace {
     const ids=new Set(this.doc.pageObjects?.map(object=>object.id));
     for(const [id,cached] of this.pageObjectNodes)if(!ids.has(id)){cached.node.remove();this.pageObjectNodes.delete(id);}
     const native=!!(this.nativeInkActive && !this.nativeWebHandoff && !this.nativeDialogHandoff && !this.magnifyWebViewMode);
-    for (const object of this.doc.pageObjects ?? []) {
+    for (const [index, object] of (this.doc.pageObjects ?? []).entries()) {
       const cached=this.pageObjectNodes.get(object.id),source=this.attachmentImages.source(object);
       if(cached && cached.object===object && cached.tool===this.tool && cached.selected===this.selectedObjectId && cached.native===native && cached.source===source){
-        this.containerEl.append(cached.node);continue;
+        // Appending an already mounted image detaches/reinserts its decoded layer and damages
+        // its whole footprint during a local text erase. Retain both the node and its parentage.
+        const z=String(4+index); if(cached.node.style.zIndex!==z)cached.node.style.zIndex=z;
+        if(cached.node.parentNode!==this.containerEl)this.containerEl.append(cached.node);
+        continue;
       }
       cached?.node.remove();
       const node = document.createElement("div"); node.className = "rw-page-object";
       this.pageObjectNodes.set(object.id,{object,tool:this.tool,selected:this.selectedObjectId,native,source,node});
-      node.dataset.pageObject = object.id;
+      node.dataset.pageObject = object.id; node.style.zIndex=String(4+index);
       const paint = (value: PageObject) => {
         node.style.left = `${value.x}px`; node.style.top = `${value.y}px`;
         node.style.width = `${value.width}px`; node.style.height = `${value.height}px`;
@@ -4125,7 +4130,8 @@ export class PenWorkspace {
         const resize = document.createElement("button"); resize.innerHTML = this.textBoxIcon("resize"); resize.setAttribute("aria-label", isAttachmentObject(object) ? "Resize attachment" : "Resize shape");
         const remove = document.createElement("button"); remove.innerHTML = this.textBoxIcon("delete"); remove.setAttribute("aria-label", isAttachmentObject(object) ? "Delete attachment" : "Delete shape");
         bindPenButton(remove, () => { this.pushHistory(); this.doc = { ...this.doc, pageObjects: this.doc.pageObjects?.filter(o => o.id !== object.id) }; this.relayout(); this.props.onLayoutChanged?.(); });
-        controls.append(move, resize, remove);
+        if (object.kind === "image") { node.classList.add("rw-image-selected"); controls.append(remove); }
+        else controls.append(move, resize, remove);
         if (isAttachmentObject(object) && object.kind !== 'image' && object.kind !== 'audio') {
           const open = document.createElement('button');
           open.textContent = 'Open';
@@ -4135,11 +4141,12 @@ export class PenWorkspace {
         }
         if (object.y < 36) { controls.style.bottom = "auto"; controls.style.top = "0px"; }
         node.append(controls);
-        const bindDrag = (target: HTMLElement, sizing: boolean) => {
+        const bindDrag = (target: HTMLElement, sizing: boolean | ImageHandle) => {
           let gesture: { id: number; x: number; y: number; before: PageObject; changed: boolean } | null = null;
           target.style.touchAction = "none";
           target.addEventListener("pointerdown", e => {
             e.stopPropagation(); e.preventDefault();
+            if (gesture || e.button > 0) return;
             const current = this.doc.pageObjects?.find(o => o.id === object.id); if (!current) return;
             this.pushHistory(); gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, before: current, changed: false };
             target.setPointerCapture?.(e.pointerId);
@@ -4148,9 +4155,8 @@ export class PenWorkspace {
             if (!gesture || gesture.id !== e.pointerId) return; e.stopPropagation();
             const dx = e.clientX-gesture.x, dy = e.clientY-gesture.y, before = gesture.before;
             const minimum = objectMinimumSize(before);
-            const imageScale = Math.max(minimum.width/before.width, minimum.height/before.height,
-              Math.min((this.width-before.x)/before.width, Math.max((before.width+dx)/before.width, (before.height+dy)/before.height)));
-            const value = sizing ? { ...before, width: before.kind === 'image' ? before.width*imageScale : Math.max(minimum.width, Math.min(this.width-before.x, before.width+dx)), height: before.kind === 'image' ? before.height*imageScale : Math.max(minimum.height, before.height+dy) }
+            const value = typeof sizing === 'string' ? resizeImage(before, sizing, dx, dy, this.width)
+              : sizing ? { ...before, width: Math.max(minimum.width, Math.min(this.width-before.x, before.width+dx)), height: Math.max(minimum.height, before.height+dy) }
               : { ...before, x: Math.max(0, Math.min(this.width-before.width, before.x+dx)), y: Math.max(0, before.y+dy) };
             gesture.changed = true;
             this.doc = { ...this.doc, pageObjects: this.doc.pageObjects?.map(o => o.id === object.id ? value : o) };
@@ -4163,7 +4169,16 @@ export class PenWorkspace {
           };
           target.addEventListener("pointerup", finish); target.addEventListener("pointercancel", finish);
         };
-        bindDrag(move, false); bindDrag(content, false); bindDrag(resize, true);
+        bindDrag(content, false);
+        if (object.kind === 'image') {
+          content.setAttribute('aria-label', 'Move attachment');
+          for (const handle of IMAGE_HANDLES) {
+            const grip = document.createElement('div');
+            grip.className = 'rw-image-handle'; grip.dataset.handle = handle;
+            grip.setAttribute('aria-label', `Resize image ${handle}`);
+            node.append(grip); bindDrag(grip, handle);
+          }
+        } else { bindDrag(move, false); bindDrag(resize, true); }
       }
       this.containerEl.append(node);
     }

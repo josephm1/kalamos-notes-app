@@ -198,6 +198,12 @@ captures the full content bitmap at its stable surface origin. Only the physical
 regional. Capturing a cropped dirty bitmap and then storing it as the content layer draws that crop
 at `(0,0)`, which pins or duplicates the editor at the top-left.
 
+`Surface.lockCanvas(Rect)` receives an in/out buffer-damage rectangle and may enlarge it. Pass a
+copy at the SurfaceHolder boundary: the original operation's e-ink refresh and erase-clean bounds
+must remain independent. Paint the full retained bitmap to satisfy Android's expanded buffer damage,
+while keeping the intended physical refresh regional. The image-page native regression simulates
+full-buffer expansion; unchanged image DOM layers also stay mounted during local text edits.
+
 Extra arguments passed to `snapshotContent()` are ignored by JavaScript. Use the explicit
 `snapshotContentPartial()` bridge method.
 

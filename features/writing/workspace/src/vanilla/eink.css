@@ -1766,3 +1766,23 @@ body.magnify-active .vanilla-app.direct-workspace .v-modal {
 .rw-audio-time { font-size:12px; line-height:16px; font-variant-numeric:tabular-nums; }
 .vanilla-app .rw-audio-play { pointer-events:auto; display:flex; align-items:center; justify-content:center; flex:0 0 30px; width:30px; min-width:30px; height:34px; min-height:34px; margin:0; padding:3px; border:0; background:#fff; color:#000; }
 .vanilla-app .rw-audio-play svg { width:22px; height:22px; }
+
+/* White grips stay legible on e-ink; larger transparent targets accept pen contacts. */
+.rw-page-object.rw-image-selected { border: 0; outline: 1px solid #000; }
+.rw-image-selected > .rw-page-object-content { cursor: move; }
+.rw-image-handle {
+  position: absolute; width: 28px; height: 28px; z-index: 2;
+  transform: translate(-50%, -50%); touch-action: none;
+}
+.rw-image-handle::after {
+  content: ''; position: absolute; inset: 8px;
+  border: 1px solid #000; background: #fff;
+}
+.rw-image-handle[data-handle=nw] { left: 0; top: 0; cursor: nwse-resize; }
+.rw-image-handle[data-handle=n] { left: 50%; top: 0; cursor: ns-resize; }
+.rw-image-handle[data-handle=ne] { left: 100%; top: 0; cursor: nesw-resize; }
+.rw-image-handle[data-handle=e] { left: 100%; top: 50%; cursor: ew-resize; }
+.rw-image-handle[data-handle=se] { left: 100%; top: 100%; cursor: nwse-resize; }
+.rw-image-handle[data-handle=s] { left: 50%; top: 100%; cursor: ns-resize; }
+.rw-image-handle[data-handle=sw] { left: 0; top: 100%; cursor: nesw-resize; }
+.rw-image-handle[data-handle=w] { left: 0; top: 50%; cursor: ew-resize; }

@@ -108,7 +108,8 @@ with Format with AI in Zoom's former slot; Zoom remains in expanded mode. The ex
 one column whenever its fixed controls fit, otherwise two columns, with no rail scrolling.
 
 Attachments use the existing page-object geometry, history, movement and resize owners. Image
-resizing preserves aspect; images and their page-local ink move together. Audio is a small
+corner grips preserve the current aspect ratio, edge grips resize one axis, and the image centre
+drags to move. Images and their page-local ink move together. Audio is a small
 play/pause card with elapsed/total time; selecting an object exposes the existing manipulation
 controls. Link cards open in the system browser; other file cards use Android's associated app.
 
