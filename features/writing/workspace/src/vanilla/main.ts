@@ -1,3 +1,5 @@
+import type { Attachment, PageAttachment, AudioStatus } from "../editor/pageAttachments";
+import type { PageObject } from "../editor/pageObjects";
 // Vanilla shell — mirrors a slice of src/app/App.tsx: open a document, render
 // it with PaginatedReader, open the focused PenWorkspace on a block, commit
 // edits back through the same pure commit.ts used by the React app, and
@@ -66,6 +68,9 @@ export type WorkspaceNativeHooks = {
 };
 
 export type CreateAppOptions = {
+  loadAttachmentImage?: (attachment: Attachment) => Promise<string>;
+  onActivateAttachment?: (object: PageObject) => void;
+  onAttachmentError?: (message: string) => void;
   notebookToolbar?: boolean;
   documentAction?: {label:string;shortLabel?:string;run:()=>void};
   documentActions?: {label:string;shortLabel?:string;onPress?:()=>boolean;run:()=>void}[];
@@ -86,6 +91,9 @@ export type CreateAppOptions = {
 
 export type VanillaApp = {
   openDocument(opened: OpenedDocument): Promise<void>;
+  addAttachment(value: PageAttachment): Promise<void>;
+  arrangeAttachments(): void;
+  updateAttachmentAudio(status:AudioStatus):void;
   openSample(): Promise<void>;
   /** True while the focused pen workspace modal is open. */
   isEditing(): boolean;
@@ -327,6 +335,9 @@ export function createApp(host: HTMLElement, opts: CreateAppOptions): VanillaApp
       prefs,
       eink: true,
       native: hooks?.native ?? false,
+      loadAttachmentImage: opts.loadAttachmentImage,
+      onActivateAttachment: opts.onActivateAttachment,
+      onAttachmentError: opts.onAttachmentError,
       onLayoutChanged: hooks?.onWorkspaceLayout,
       onContentRegionChange: hooks?.onWorkspaceContentRegion,
       onToolChange: hooks?.onWorkspaceTool,
@@ -514,6 +525,15 @@ export function createApp(host: HTMLElement, opts: CreateAppOptions): VanillaApp
   let checkpointPending:Promise<void>|null=null;
   return {
     openDocument: attachDocument,
+    addAttachment: async value => {
+      const target = workspace;
+      if (!target) throw new Error('Open a page before attaching content.');
+      await target.addAttachment(value);
+      if (target !== workspace) throw new Error('The page changed. Open Attach again.');
+      await target.checkpoint();
+    },
+    arrangeAttachments: () => workspace?.arrangeAttachments(),
+    updateAttachmentAudio: status => workspace?.updateAttachmentAudio(status),
     openSample,
     isEditing: () => workspace !== null,
     closeWorkspace,

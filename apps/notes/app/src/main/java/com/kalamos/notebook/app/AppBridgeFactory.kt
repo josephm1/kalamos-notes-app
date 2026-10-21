@@ -25,8 +25,9 @@ private class NotesBridge(private val fragment: Fragment, webView: WebView) :
     LocalAppBridge(fragment.requireContext().applicationContext, webView) {
     private val agora = com.kalamos.notebook.exchange.AgoraBridge(fragment, ::emit)
     private val models = com.kalamos.notebook.ai.NotesAiModels(com.kalamos.notebook.ai.NotesAiSettings(context), ::emit)
+    private val attachments=com.kalamos.notebook.attachments.NotesAttachments(fragment, ::emit)
     private val sharing=com.kalamos.notebook.sharing.NotesImageShare(context)
-    override fun onRelease() { sharing.release();models.release(); agora.release() }
+    override fun onRelease() { attachments.release();sharing.release();models.release(); agora.release() }
     override fun other(method: String, args: JSONObject): String? = when (method) {
         "notes.import.pending" -> com.kalamos.notebook.sharing.MarkdownImport.pending(context,fragment.requireActivity().intent).toString()
         "notes.import.ack" -> {
@@ -64,6 +65,6 @@ private class NotesBridge(private val fragment: Fragment, webView: WebView) :
                 }
             JSONObject().put("templates",entries).put("path",directory.absolutePath).toString()
         }
-        else -> agora.call(method, args)
+        else -> attachments.call(method, args) ?: agora.call(method, args)
     }
 }

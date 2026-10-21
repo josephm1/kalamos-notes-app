@@ -22,3 +22,9 @@ it('keeps all text when a semantic element continues into a second box',()=>{
  sheet.sidecar.textBoxes!.push({...box,id:'continuation',text:'Second',y:112,semantic:{...box.semantic!,continuation:true}});
  expect(notebookSheetsToMarkdown([sheet])).toBe('First\nSecond');
 });
+it('shares a placed web reference as Markdown without exposing local attachment IDs',()=>{
+ const sidecar=createEmptySidecar('note','fingerprint');
+ sidecar.pageObjects=[{id:'reference',kind:'link',link:{url:'https://example.org/guide',title:'Guide'},x:24,y:56,width:240,height:76,color:'#000000',strokeWidth:1},
+ {id:'audio',kind:'audio',attachment:{id:'a'.repeat(64),name:'Recording.mp3',mime:'audio/mpeg'},x:24,y:132,width:240,height:52,color:'#000000',strokeWidth:1}];
+ expect(notebookSheetsToMarkdown([{source:'\u200b',sidecar}])).toBe('[Guide](<https://example.org/guide>)');
+});

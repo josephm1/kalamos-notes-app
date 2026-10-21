@@ -1,3 +1,4 @@
+import type { PageAttachment, AudioStatus } from "../editor/pageAttachments";
 import { markdownImportBlocks } from "../editor/markdownImport";
 import { notebookSheetsToMarkdown } from "../editor/notebookMarkdown";
 import { BackgroundSave } from "./backgroundSave";
@@ -59,6 +60,10 @@ export type KalamosWriteWorkspaceApi = {
   openNotebook(notebookId: string): void;
   /** Open only the ruled editing surface for a Notes-style planning notebook. */
   openWorkspaceNotebook(notebookId: string): void;
+  attachmentContext(): {notebookId:string;pageId:string;owner:number} | null;
+  addAttachment(context:{notebookId:string;pageId:string;owner:number},value:PageAttachment):Promise<void>;
+  arrangeAttachments():void;
+  updateAttachmentAudio(status:AudioStatus):void;
   isOpen(): boolean;
   hasOpenDialog(): boolean;
   close(save?: boolean): void;
@@ -92,6 +97,7 @@ const workspaceStore = createKalamosStore({
 });
 
 let app: VanillaApp | null = null;
+let attachmentOwner = 0;
 let openId: string | null = null;
 let native: Write2Native | null = null;
 let aiPanel: WriteAiPanel | null = null;
@@ -192,7 +198,8 @@ async function renderSavedPage(id:string,page:WorkspacePages['pages'][number],he
  const host=document.createElement('div');host.style.cssText=`position:fixed;left:-10000px;top:0;width:${w}px;height:${h}px;pointer-events:none`;host.inert=true;document.body.append(host);
  let ws:PenWorkspace|undefined;
  try{
-  ws=new PenWorkspace(host,{block:{id:'planning-document',type:'paragraph',sourceStart:0,sourceEnd:source.length,source,text:source},existingRuns:sidecar?.inkRuns??[],existingTextBoxes:sidecar?.textBoxes,existingPageObjects:sidecar?.pageObjects,existingSourceWords:sidecar?.sourceWords,existingLineHeight:sidecar?.layoutLineHeight,prefs,eink:true,native:false,onCommit(){},onCancel(){}});
+  ws=new PenWorkspace(host,{block:{id:'planning-document',type:'paragraph',sourceStart:0,sourceEnd:source.length,source,text:source},existingRuns:sidecar?.inkRuns??[],existingTextBoxes:sidecar?.textBoxes,existingPageObjects:sidecar?.pageObjects,loadAttachmentImage:window.KalamosWritingHost?.loadAttachmentImage,existingSourceWords:sidecar?.sourceWords,existingLineHeight:sidecar?.layoutLineHeight,prefs,eink:true,native:false,onCommit(){},onCancel(){}});
+  await ws.readyAttachments();
   return {svg:ws.exportSvgPages({pageHeight:h,singlePage:true})[0],png:thumbnail?ws.renderThumbnailDataUrl():null};
  }finally{ws?.destroy();host.remove();}
 }
@@ -398,6 +405,7 @@ function openNotebook(notebookId: string) {
 }
 
 function openWorkspaceNotebook(notebookId: string, toolbarMode: "collapsed" | "compact" | "full" = "collapsed", keepZoom = false, notifyOpened = true) {
+  attachmentOwner++;
   if(refreshingNotebook){revisionRefreshToken++;refreshingNotebook=null;root().replaceChildren();}
   if (openId) close(true);
   sheets = loadSheets(notebookId);
@@ -416,6 +424,12 @@ function openWorkspaceNotebook(notebookId: string, toolbarMode: "collapsed" | "c
   app = createApp(root(), {
     store: sheetStore(page),
     notebookToolbar: window.KalamosWritingHost?.notebookToolbar,
+    loadAttachmentImage: attachment => {
+      const load=window.KalamosWritingHost?.loadAttachmentImage;
+      return load ? load(attachment) : Promise.reject(new Error('Image attachments are unavailable.'));
+    },
+    onActivateAttachment: object => window.KalamosWritingHost?.activateAttachment?.(object),
+    onAttachmentError: message => window.KalamosWritingHost?.attachmentError?.(message),
     documentAction:window.KalamosWritingHost?.documentAction?{label:window.KalamosWritingHost.documentAction.label,shortLabel:window.KalamosWritingHost.documentAction.shortLabel,run:()=>window.KalamosWritingHost?.documentAction?.run(notebookId)}:undefined,
     documentActions:window.KalamosWritingHost?.documentActions?.map(action=>({...action,onPress:action.onPress?()=>action.onPress!(notebookId):undefined,run:()=>action.run(notebookId)})),
     pageTools: { overview: openPageOverview, index: sheets.active, count: sheets.pages.length, change: action => void changeSheet(action), overflow: height => void paginateCurrentSheet(height) },
@@ -451,6 +465,7 @@ function openWorkspaceNotebook(notebookId: string, toolbarMode: "collapsed" | "c
 
 let closeComplete: Promise<void> = Promise.resolve();
 function close(save = true) {
+  attachmentOwner++;
   if(refreshingNotebook && !app) {
     const id=refreshingNotebook;refreshingNotebook=null;revisionRefreshToken++;
     native?.cancelPageTurn();native?.suspend();exitSurface();
@@ -659,7 +674,8 @@ const api: KalamosWriteWorkspaceApi = {
       host.style.cssText = "position:fixed;left:-10000px;top:0;width:572px;height:772px";
       document.body.append(host);
       try {
-        const ws = new PenWorkspace(host, { block:{id:"planning-document",type:"paragraph",sourceStart:0,sourceEnd:source.length,source,text:source}, existingRuns:sidecar?.inkRuns ?? [], existingTextBoxes:sidecar?.textBoxes, existingPageObjects:sidecar?.pageObjects, existingSourceWords:sidecar?.sourceWords, existingLineHeight:sidecar?.layoutLineHeight, prefs, eink:true, native:false, onCommit:()=>{}, onCancel:()=>{} });
+        const ws = new PenWorkspace(host, { block:{id:"planning-document",type:"paragraph",sourceStart:0,sourceEnd:source.length,source,text:source}, existingRuns:sidecar?.inkRuns ?? [], existingTextBoxes:sidecar?.textBoxes, existingPageObjects:sidecar?.pageObjects,loadAttachmentImage:window.KalamosWritingHost?.loadAttachmentImage, existingSourceWords:sidecar?.sourceWords, existingLineHeight:sidecar?.layoutLineHeight, prefs, eink:true, native:false, onCommit:()=>{}, onCancel:()=>{} });
+        await ws.readyAttachments();
         pages.push(...ws.exportSvgPages()); ws.destroy();
       } finally { host.remove(); }
     }
@@ -667,8 +683,16 @@ const api: KalamosWriteWorkspaceApi = {
   },
   openNotebook,
   openWorkspaceNotebook,
+  attachmentContext: () => openId && sheets ? {notebookId:openId,pageId:sheets.pages[sheets.active].id,owner:attachmentOwner} : null,
+  async addAttachment(context,value) {
+    if(!app || context.owner!==attachmentOwner || openId!==context.notebookId || sheets?.pages[sheets.active].id!==context.pageId)
+      throw new Error('The page changed. Open Attach again on the intended page.');
+    await app.addAttachment(value);
+  },
+  arrangeAttachments: () => app?.arrangeAttachments(),
+  updateAttachmentAudio: status => app?.updateAttachmentAudio(status),
   isOpen: () => app !== null || refreshingNotebook !== null,
-  hasOpenDialog: () => !!document.getElementById(ROOT_ID)?.querySelector('[role="dialog"]'),
+  hasOpenDialog: () => !!document.getElementById(ROOT_ID)?.querySelector('[role="dialog"]') || !!document.querySelector('[data-writing-document-dialog]'),
   close,
   closeAndWait: (save = true) => { close(save); return closeComplete; },
   finishWorkspace: () => {
@@ -679,6 +703,7 @@ const api: KalamosWriteWorkspaceApi = {
   checkpointWorkspace: () => app?.checkpointWorkspace() ?? Promise.resolve(),
   async setDocumentDialog(active) { if(active)await app?.checkpointWorkspace();native?.hooks().onWorkspaceDialog?.(active); },
   onPageKey(dir) {
+    if(document.querySelector('[data-writing-document-dialog]'))return;
     const overview=document.getElementById(ROOT_ID)?.querySelector('.rw-page-overview');
     if(overview){overview.querySelector<HTMLButtonElement>(`[aria-label="${dir<0?'Previous':'Next'} overview page"]`)?.click();return;}
     if (!app) return;

@@ -1,8 +1,11 @@
+import { attachmentSvg, isAttachmentObject } from "./pageAttachments";
 import { ruledTextSize } from "./textBox";
 /** Free-page objects deliberately do not enter ruled word grouping or spacing.
  * Their vectors are saved in the sidecar and included in snapshots/export/preview. */
 export type PageObject = {
-  id:string; blockId?:string; kind:'markdown'|'rectangle'|'ellipse'|'line'|'triangle'|'star'|'sketch'|'trapezoid'|'pentagon'|'hexagon';
+  id:string; blockId?:string; kind:'image'|'audio'|'link'|'file'|'markdown'|'rectangle'|'ellipse'|'line'|'triangle'|'star'|'sketch'|'trapezoid'|'pentagon'|'hexagon';
+  attachment?: import("./pageAttachments").Attachment;
+  link?: {url:string;title:string};
   /** Read-only Markdown preview. Source is portable content; lines are display only. */
   markdown?:{id:string;source:string;lines:string[]};
   x:number; y:number; width:number; height:number; color:string; strokeWidth:number;
@@ -20,7 +23,8 @@ export function objectPath(o:PageObject):string {
   if(o.kind==='star') return Array.from({length:10},(_,i)=>{const a=i*Math.PI/5-Math.PI/2,r=i%2?22:50;return `${i?'L':'M'}${50+Math.cos(a)*r},${50+Math.sin(a)*r}`}).join(' ')+'Z';
   return 'M0 0H100V100H0Z';
 }
-export function objectSvg(o:PageObject):string {
+export function objectSvg(o:PageObject,imageSource?:string):string {
+  if(isAttachmentObject(o))return attachmentSvg(o,imageSource);
   if(o.kind==='markdown'&&o.markdown) {
     const escape=(text:string)=>text.replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[char]!));
     const lines=o.markdown.lines,lineHeight=o.height/Math.max(1,lines.length);

@@ -44,6 +44,7 @@ document.write('<script src="js/notebook-migration.js"><\/script>');
     },
     onNewIntent: function () { void receiveSharedMarkdown() },
     onBack: function () {
+      if (window.KalamosNotesAttachments?.close()) return true
       if (window.KalamosNotesAI?.closeSettings()) return true
       const editor = planningEditor()
       if (!editor || !editor.isOpen()) return false
@@ -746,3 +747,4 @@ document.write('<script src="js/notes-selection.js"><\/script>');
 document.write('<script src="js/agora-documents.js"><\/script>');
 
 document.write('<script src="js/notes-ai-settings.js"><\/script>');
+document.write('<script src="js/notes-attachments.js"><\/script>');

@@ -1,3 +1,5 @@
+import { audioCard, updateAudioCard } from "./audioCard";
+import { AttachmentImages, isAttachmentObject, validPageAttachment, drawAttachment, type Attachment, type PageAttachment, type AudioStatus } from "../editor/pageAttachments";
 import { horizontalAnchor, horizontalSpace, verticalSpace, condenseSpace, constrainTranslation, type SpatialAtom, type SpatialPlan } from "../reflow/spatialLayout";
 import { styledFragments, styleFont, parseInlineMarkdown, serializeInlineMarkdown } from '../editor/inlineStyles';
 import { measureStyledText } from '../editor/textBox';
@@ -119,6 +121,9 @@ export type WorkspacePageTools = { overview?: () => void; index: number; count: 
 export type PenWorkspaceProps = {
   /** Group expanded notebook navigation above a dedicated writing-tool rail. */
   notebookToolbar?: boolean;
+  loadAttachmentImage?: (attachment: Attachment) => Promise<string>;
+  onActivateAttachment?: (object: PageObject) => void;
+  onAttachmentError?: (message: string) => void;
   documentAction?: {label:string;shortLabel?:string;run:()=>void};
   documentActions?: {label:string;shortLabel?:string;icon?:string;onPress?:()=>boolean;run:()=>void}[];
   pageTools?: WorkspacePageTools;
@@ -434,9 +439,17 @@ export class PenWorkspace {
   private measure: { word: (w: string) => number; space: number };
   private layout!: Layout;
   private ro: ResizeObserver;
+  private attachmentImages: AttachmentImages;
+  private destroyed = false;
+  private pageObjectNodes = new Map<string,{object:PageObject;tool:Tool;selected:string|null;native:boolean;source:string|undefined;node:HTMLElement}>();
+  private audioStates = new Map<string, AudioStatus>();
+  private attachmentActivations = new Map<string, PenButtonActivation>();
 
   constructor(root: HTMLElement, props: PenWorkspaceProps) {
     this.props = props;
+    this.attachmentImages = new AttachmentImages(props.loadAttachmentImage, () => {
+      if (!this.destroyed) { this.renderOverlay(); this.props.onLayoutChanged?.(); }
+    });
     this.view = editableView(props.block);
     // E-ink is a presentation theme, not a reason to discard ink colour. Bigme's native path and
     // the classic drawing editor already accept per-stroke colours; monochrome panels render them
@@ -565,6 +578,7 @@ export class PenWorkspace {
       this.relayout();
     });
     this.ro.observe(this.containerEl);
+    void this.readyAttachments().catch(error => this.props.onAttachmentError?.(error.message));
     this.width = this.containerEl.clientWidth || 320;
 
     this.relayout();
@@ -584,7 +598,47 @@ export class PenWorkspace {
     dlog("workspace:mount", { blockId: props.block.id });
   }
 
+  async readyAttachments(): Promise<void> { await this.attachmentImages.ready(this.doc.pageObjects ?? []); }
+
+  async addAttachment(value: PageAttachment): Promise<void> {
+    const width = Math.max(48, Math.min(this.width - 32, value.kind === 'image' ? 320 : 280));
+    const ratio = value.kind === 'image' && value.attachment.width && value.attachment.height
+      ? value.attachment.height / value.attachment.width : 1;
+    const object: PageObject = { ...value, id: newInsertId('attachment'), blockId: this.props.block.id,
+      x: Math.min(24, Math.max(0, this.width-width)), y: Math.max(0, this.containerEl.scrollTop + this.lineHeight),
+      width, height: value.kind === 'image' ? Math.max(48, width*ratio) : value.kind === 'audio' ? 52 : 76,
+      color: '#000000', strokeWidth: 1, paper: false };
+    if (!['image','audio','file','link'].includes(object.kind) || !validPageAttachment(object)) throw new Error('Invalid attachment');
+    if (object.kind === 'image') await this.attachmentImages.ready([object]);
+    if (this.destroyed) throw new Error('The page was closed. Open Attach again on the intended page.');
+    this.pushHistory(); this.doc = { ...this.doc, pageObjects: [...(this.doc.pageObjects ?? []), object] };
+    this.selectedObjectId = object.id; this.setTool('objects'); this.relayout();
+    this.props.onLayoutChanged?.();
+  }
+
+  updateAttachmentAudio(status: AudioStatus): void {
+    if (!status || typeof status.playing!=='boolean' || !/^[a-f0-9]{64}$/.test(status.id) || ![status.positionMs,status.durationMs].every(n=>Number.isFinite(n)&&n>=0)) return;
+    const previous=this.audioStates.get(status.id); this.audioStates.set(status.id,status);
+    if (this.nativeInkActive && previous?.playing===status.playing) return;
+    const card=this.containerEl.querySelector<HTMLElement>(`[data-audio-attachment="${status.id}"]`);
+    if (!card) return;
+    updateAudioCard(card,status);
+    // Periodic timers must never reconcile the daemon while somebody is writing. Only an
+    // explicit playback state transition uses the existing bounded control refresh.
+    if (this.nativeInkActive && previous?.playing!==status.playing) {
+      const rect=card.getBoundingClientRect();
+      this.props.onContentRegionChange?.({l:rect.left,t:rect.top,r:rect.right,b:rect.bottom});
+    }
+  }
+  private attachmentActivation(id:string):PenButtonActivation {
+    let value=this.attachmentActivations.get(id);
+    if(!value){value={activatedAt:-Infinity};this.attachmentActivations.set(id,value);}return value;
+  }
+
+  arrangeAttachments(): void { this.afterNativeFlush(() => this.setTool('objects')); }
+
   destroy() {
+    this.destroyed = true; this.attachmentImages.dispose(); this.pageObjectNodes.clear();
     this.settleSpacingGesture(true);
     this.root.removeEventListener("pointerdown", this.observePenActivity, true);
     this.containerEl.removeEventListener("pointerleave", this.hideEraserTip);
@@ -2419,6 +2473,19 @@ export class PenWorkspace {
    */
   applyNativeWriteStroke(points: InkPoint[], render = true, checkboxGestures = new Set<string>(), existingInk?:ReadonlySet<string>): ScribbleResult | {kind:"widget";rect:{x:number;y:number;w:number;h:number}} | null {
     if (points.length === 0) return null;
+    // The same single-owner control contract as checkboxes: native pen taps on audio controls
+    // activate once per batch, retire the temporary dot and never become notebook strokes.
+    for (const object of this.doc.pageObjects ?? []) {
+      if (object.kind!=='audio' || !object.attachment) continue;
+      const first=points[0],left=object.x,right=object.x+44,top=object.y,bottom=object.y+object.height;
+      if(first.x<left||first.x>right||first.y<top||first.y>bottom ||
+        !points.every(p=>p.x>=left&&p.x<=right&&p.y>=top&&p.y<=bottom&&Math.hypot(p.x-first.x,p.y-first.y)<=12))continue;
+      const activation=this.attachmentActivation(object.id);
+      activation.activatedAt=performance.now();activation.nativePenContact=this.nativeOwnsControlPen();
+      const key=`audio-${object.id}`;
+      if(!checkboxGestures.has(key)){checkboxGestures.add(key);this.props.onActivateAttachment?.(object);}
+      return {kind:'widget',rect:{x:object.x-4,y:object.y-4,w:object.width+8,h:object.height+8}};
+    }
     // Checkbox taps and short drawn marks delivered by the daemon are controls, not saved ink.
     // The caller replaces only this small region through the existing native
     // composition transaction; ordinary strokes still do no DOM work.
@@ -2435,7 +2502,7 @@ export class PenWorkspace {
       // An X can have two strokes in one native batch. It is still one checkbox action.
       const activation = this.checkboxActivation(box.id);
       activation.activatedAt = performance.now();
-      activation.nativePenContact = this.nativeOwnsChecklistPen();
+      activation.nativePenContact = this.nativeOwnsControlPen();
       if (!checkboxGestures.has(box.id)) {
         this.setChecklist(box.id, box.text !== "☑");
         checkboxGestures.add(box.id);
@@ -2726,6 +2793,7 @@ export class PenWorkspace {
       );
     }
     for (const object of this.doc.pageObjects ?? []) {
+      if(isAttachmentObject(object)){drawAttachment(ctx,object,this.attachmentImages.image(object));for(const stroke of objectInkOnPage(object))fillStroke(ctx,stroke.points,stroke.width,stroke.color,stroke.brushStyle);continue;}
       if(object.kind==='markdown'){drawMarkdownObject(ctx,object);for(const stroke of objectInkOnPage(object))fillStroke(ctx,stroke.points,stroke.width,stroke.color,stroke.brushStyle);continue;}
       ctx.save(); ctx.translate(object.x, object.y); ctx.scale(object.width/100, object.height/100);
       const path = new Path2D(objectPath(object)); ctx.strokeStyle = object.color; ctx.fillStyle = object.filled ? object.color : "#ffffff";
@@ -2758,7 +2826,7 @@ export class PenWorkspace {
     const pages: string[] = [];
     for(let top=0;top<height;top+=pageHeight) {
       const rules = Array.from({length:Math.floor(pageHeight/this.lineHeight)},(_,i)=>`<path d="M0 ${top+(i+1)*this.lineHeight} H${this.width}" stroke="#000" stroke-width="1"/>`).join("");
-      pages.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 ${top} ${this.width} ${pageHeight}" width="${this.width}" height="${pageHeight}"><rect x="0" y="${top}" width="${this.width}" height="${pageHeight}" fill="#fff"/>${rules}${text}${ink}${(this.doc.pageObjects??[]).map(object=>objectSvg(object)+objectInkOnPage(object).map(stroke=>`<path d="${outlinePathD(strokeOutline(stroke.points,stroke.width,stroke.brushStyle))}" fill="${escape(stroke.color)}"/>`).join("")).join("")}</svg>`);
+      pages.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 ${top} ${this.width} ${pageHeight}" width="${this.width}" height="${pageHeight}"><rect x="0" y="${top}" width="${this.width}" height="${pageHeight}" fill="#fff"/>${rules}${text}${ink}${(this.doc.pageObjects??[]).map(object=>objectSvg(object,this.attachmentImages.source(object))+objectInkOnPage(object).map(stroke=>`<path d="${outlinePathD(strokeOutline(stroke.points,stroke.width,stroke.brushStyle))}" fill="${escape(stroke.color)}"/>`).join("")).join("")}</svg>`);
     }
     return pages;
   }
@@ -3990,7 +4058,7 @@ export class PenWorkspace {
     node.innerHTML = objectSvg({...object,x:0,y:0});
   }
 
-  private nativeOwnsChecklistPen(): boolean {
+  private nativeOwnsControlPen(): boolean {
     return this.nativeInkActive && this.tool === "write" && !this.magnifyPad;
   }
 
@@ -4016,13 +4084,25 @@ export class PenWorkspace {
   }
 
   private renderPageObjects() {
+    const ids=new Set(this.doc.pageObjects?.map(object=>object.id));
+    for(const [id,cached] of this.pageObjectNodes)if(!ids.has(id)){cached.node.remove();this.pageObjectNodes.delete(id);}
+    const native=!!(this.nativeInkActive && !this.nativeWebHandoff && !this.nativeDialogHandoff && !this.magnifyWebViewMode);
     for (const object of this.doc.pageObjects ?? []) {
+      const cached=this.pageObjectNodes.get(object.id),source=this.attachmentImages.source(object);
+      if(cached && cached.object===object && cached.tool===this.tool && cached.selected===this.selectedObjectId && cached.native===native && cached.source===source){
+        this.containerEl.append(cached.node);continue;
+      }
+      cached?.node.remove();
       const node = document.createElement("div"); node.className = "rw-page-object";
+      this.pageObjectNodes.set(object.id,{object,tool:this.tool,selected:this.selectedObjectId,native,source,node});
       node.dataset.pageObject = object.id;
       const paint = (value: PageObject) => {
         node.style.left = `${value.x}px`; node.style.top = `${value.y}px`;
         node.style.width = `${value.width}px`; node.style.height = `${value.height}px`;
-        content.innerHTML = objectSvg({ ...value, x: 0, y: 0 });
+        if(value.kind==='audio' && value.attachment) {
+          content.replaceChildren(audioCard(value,this.audioStates.get(value.attachment.id),()=>this.props.onActivateAttachment?.(value),
+            this.attachmentActivation(value.id),()=>this.nativeOwnsControlPen()));
+        } else content.innerHTML = objectSvg({ ...value, x: 0, y: 0 }, this.attachmentImages.source(value));
         const nativeOwnsInk=this.nativeInkActive && !this.nativeWebHandoff && !this.nativeDialogHandoff && !this.magnifyWebViewMode;
         if(!nativeOwnsInk && value.ink?.length) {
           const ink=document.createElementNS("http://www.w3.org/2000/svg","svg");
@@ -4041,11 +4121,18 @@ export class PenWorkspace {
           this.containerEl.append(node); continue;
         }
         const controls = document.createElement("div"); controls.className = "rw-object-actions";
-        const move = document.createElement("button"); move.innerHTML = this.textBoxIcon("move"); move.setAttribute("aria-label", "Move shape");
-        const resize = document.createElement("button"); resize.innerHTML = this.textBoxIcon("resize"); resize.setAttribute("aria-label", "Resize shape");
-        const remove = document.createElement("button"); remove.innerHTML = this.textBoxIcon("delete"); remove.setAttribute("aria-label", "Delete shape");
+        const move = document.createElement("button"); move.innerHTML = this.textBoxIcon("move"); move.setAttribute("aria-label", isAttachmentObject(object) ? "Move attachment" : "Move shape");
+        const resize = document.createElement("button"); resize.innerHTML = this.textBoxIcon("resize"); resize.setAttribute("aria-label", isAttachmentObject(object) ? "Resize attachment" : "Resize shape");
+        const remove = document.createElement("button"); remove.innerHTML = this.textBoxIcon("delete"); remove.setAttribute("aria-label", isAttachmentObject(object) ? "Delete attachment" : "Delete shape");
         bindPenButton(remove, () => { this.pushHistory(); this.doc = { ...this.doc, pageObjects: this.doc.pageObjects?.filter(o => o.id !== object.id) }; this.relayout(); this.props.onLayoutChanged?.(); });
         controls.append(move, resize, remove);
+        if (isAttachmentObject(object) && object.kind !== 'image' && object.kind !== 'audio') {
+          const open = document.createElement('button');
+          open.textContent = 'Open';
+          open.className = 'rw-attachment-open';
+          open.setAttribute('aria-label', 'Open attachment');
+          bindPenButton(open, () => this.props.onActivateAttachment?.(object)); controls.append(open);
+        }
         if (object.y < 36) { controls.style.bottom = "auto"; controls.style.top = "0px"; }
         node.append(controls);
         const bindDrag = (target: HTMLElement, sizing: boolean) => {
@@ -4061,7 +4148,9 @@ export class PenWorkspace {
             if (!gesture || gesture.id !== e.pointerId) return; e.stopPropagation();
             const dx = e.clientX-gesture.x, dy = e.clientY-gesture.y, before = gesture.before;
             const minimum = objectMinimumSize(before);
-            const value = sizing ? { ...before, width: Math.max(minimum.width, Math.min(this.width-before.x, before.width+dx)), height: Math.max(minimum.height, before.height+dy) }
+            const imageScale = Math.max(minimum.width/before.width, minimum.height/before.height,
+              Math.min((this.width-before.x)/before.width, Math.max((before.width+dx)/before.width, (before.height+dy)/before.height)));
+            const value = sizing ? { ...before, width: before.kind === 'image' ? before.width*imageScale : Math.max(minimum.width, Math.min(this.width-before.x, before.width+dx)), height: before.kind === 'image' ? before.height*imageScale : Math.max(minimum.height, before.height+dy) }
               : { ...before, x: Math.max(0, Math.min(this.width-before.width, before.x+dx)), y: Math.max(0, before.y+dy) };
             gesture.changed = true;
             this.doc = { ...this.doc, pageObjects: this.doc.pageObjects?.map(o => o.id === object.id ? value : o) };
@@ -4817,6 +4906,9 @@ export class PenWorkspace {
     const c = this.containerEl;
     const retainedInk = new Map<string, SVGElement>();
     Array.from(c.children).forEach((child) => {
+      // Retain image/widget DOM across unrelated handwriting/text changes; decoding a photo
+      // again on every word would put attachment work on the ordinary writing path.
+      if(!this.keyboard && child instanceof HTMLElement && child.dataset.pageObject)return;
       // Keep the on-page input and Android composing state across IME resize.
       if (this.textPromptEl && child instanceof HTMLElement && child.contains(this.textPromptEl)) return;
       // the magnify target overlay is owned by MagnifyPad and survives overlay rebuilds
@@ -4878,7 +4970,7 @@ export class PenWorkspace {
           bindPenButton(check, () => {
             const checked = checkBox.text !== "☑";
             this.afterNativeFlush(() => this.setChecklist(checkBox.id, checked));
-          }, true, this.checkboxActivation(checkBox.id), () => this.nativeOwnsChecklistPen());
+          }, true, this.checkboxActivation(checkBox.id), () => this.nativeOwnsControlPen());
           span.replaceChildren(check);
         }
         // Starter headings are real text boxes, not baked-in template decoration.

@@ -83,7 +83,11 @@ declare const App: {
 };
 
 interface Window {
-  KalamosWritingHost?: {notebookToolbar?:boolean;onDocumentClosed?:(notebookId:string)=>void;onDocumentOpened?:(notebookId:string)=>void;documentActions?: {label:string;shortLabel?:string;icon?:string;onPress?:(notebookId:string)=>boolean;run:(notebookId:string)=>void}[];documentAction?: {label:string;shortLabel?:string;run:(notebookId:string)=>void}};
+  KalamosWritingHost?: {
+    loadAttachmentImage?:(attachment:import('../editor/pageAttachments').Attachment)=>Promise<string>;
+    activateAttachment?:(object:import('../editor/pageObjects').PageObject)=>void;
+    attachmentError?:(message:string)=>void;
+    notebookToolbar?:boolean;onDocumentClosed?:(notebookId:string)=>void;onDocumentOpened?:(notebookId:string)=>void;documentActions?: {label:string;shortLabel?:string;icon?:string;onPress?:(notebookId:string)=>boolean;run:(notebookId:string)=>void}[];documentAction?: {label:string;shortLabel?:string;run:(notebookId:string)=>void}};
   KalamosWriteWorkspace?: import("./entry").KalamosWriteWorkspaceApi;
   KalamosToolbarIcons?: {
     svg(name: string): string;

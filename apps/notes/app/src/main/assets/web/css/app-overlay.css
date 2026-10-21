@@ -529,3 +529,22 @@ input, textarea, [contenteditable=true] { -webkit-user-select:text; user-select:
   .notes-ai-model-row { flex-direction:column; align-items:stretch; }
   .notes-ai-model-row select { width:100%; }
 }
+
+/* The attachment picker is the same small, paper-white menu pattern as pen tools. */
+.notes-attachment-backdrop { position:fixed; inset:0; z-index:20000; background:transparent; color:#000; font-family:var(--font-ui,Arial,sans-serif); }
+.notes-attachment-menu { position:fixed; box-sizing:border-box; width:220px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow:auto; padding:0; border:1px solid #000; border-radius:4px; background:#fff; color:#000; box-shadow:none; scrollbar-width:none; }
+.notes-attachment-heading { display:none; padding:10px; border-bottom:1px solid #000; }
+.notes-attachment-heading h2 { font-size:16px; line-height:20px; margin:0; }
+.notes-attachment-menu.link-editor .notes-attachment-heading { display:block; }
+.notes-attachment-options { display:flex; flex-direction:column; }
+.notes-attachment-menu button { appearance:none; box-sizing:border-box; min-height:40px; margin:0; padding:8px 12px; border:0; border-radius:0; background:#fff; color:#000; font-family:inherit; font-size:16px; line-height:24px; text-align:left; }
+.notes-attachment-options > button { width:100%; }
+.notes-attachment-options > .attachment-arrange { border-top:1px solid #000; }
+.notes-attachment-menu button:disabled { opacity:1; color:#666; }
+.notes-attachment-menu button:focus-visible { outline:1px solid #000; outline-offset:-3px; }
+.notes-attachment-status { margin:0; padding:8px 10px; font-size:13px; line-height:18px; border-bottom:1px solid #000; }
+.notes-attachment-status:empty { display:none; }
+.notes-attachment-footer { display:none; border-top:1px solid #000; }
+.notes-attachment-menu.link-editor .notes-attachment-footer { display:flex; justify-content:space-between; }
+.notes-attachment-menu.link-editor .notes-attachment-options { gap:8px; padding:10px; }
+.notes-attachment-options > input { box-sizing:border-box; width:100%; min-height:40px; padding:7px; border:1px solid #000; background:#fff; color:#000; font-family:inherit; font-size:16px; }

@@ -1,3 +1,4 @@
+import { validPageAttachment } from "../editor/pageAttachments";
 import { normalizeInlineStyles } from '../editor/inlineStyles';
 // Ink sidecar — persisted as `document-name.write2.json`. Keeps strokes OUT of
 // the Markdown so an ordinary editor still opens a clean source file.
@@ -116,8 +117,9 @@ function migrate(obj: Record<string, unknown>): Sidecar {
     ? out.sourceWords : undefined;
   if (!Number.isFinite(out.layoutLineHeight) || out.layoutLineHeight! < 24 || out.layoutLineHeight! > 120) out.layoutLineHeight = undefined;
   if (out.pageObjects !== undefined) out.pageObjects = Array.isArray(out.pageObjects) ? out.pageObjects.filter(o =>
-    o && typeof o.id === "string" && ["markdown","rectangle","ellipse","line","triangle","star","sketch","trapezoid","pentagon","hexagon"].includes(o.kind) &&
+    o && typeof o.id === "string" && ["image","audio","link","file","markdown","rectangle","ellipse","line","triangle","star","sketch","trapezoid","pentagon","hexagon"].includes(o.kind) &&
     (o.kind!=='markdown'||(o.markdown&&typeof o.markdown.id==='string'&&o.markdown.id.length<=120&&typeof o.markdown.source==='string'&&o.markdown.source.length<=1_048_576&&Array.isArray(o.markdown.lines)&&o.markdown.lines.length<=1000&&o.markdown.lines.every(line=>typeof line==='string'&&line.length<=4096))) &&
+    validPageAttachment(o) &&
     [o.x,o.y,o.width,o.height,o.strokeWidth].every(Number.isFinite) && o.x>=0 && o.y>=0 && o.width>0 && o.height>0 &&
     o.strokeWidth>0 && /^#[0-9a-f]{6}$/i.test(o.color) &&
     (o.points === undefined || Array.isArray(o.points) && o.points.every(p=>p && Number.isFinite(p.x)&&Number.isFinite(p.y))) &&

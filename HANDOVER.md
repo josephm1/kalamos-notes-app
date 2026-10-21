@@ -1,3 +1,21 @@
+## 21 October 2026 — Compact AI action and page attachments
+
+Compact Notes replaces Zoom with the existing Format with AI action without adding a row. Zoom
+remains in expanded tools. Expanded tools include one Attach menu, use a fixed single column when
+it fits, and retain the smaller-screen two-column layout without rail scrolling. The menu follows
+the existing small pen-menu presentation; audio cards contain play/pause and elapsed/total time.
+
+Files import through Android's picker on a Notes-owned IO worker into the active data root's
+immutable attachments store. Shared workspace page objects own geometry, image aspect-preserving
+resize, move/delete, Undo/save, snapshots and self-contained image export/thumbnail rendering.
+Links open externally; files use a narrow FileProvider cache. No app/sibling source dependency or
+provider/AI request. Native audio releases on background/close and observes audio focus. Timer
+updates never mutate writing DOM while the daemon is active; pen audio controls reuse bounded
+widget reconciliation and single-owner activation. No vendor code, daemon cadence, waveform or
+hard-close mechanics changed. Resource IDs remain valid across page copies and Undo.
+
+Physical testing remains owner-run. Desktop checks and builds do not certify e-ink acceptance.
+
 ## 20 October 2026 — Fail-closed API credential storage
 
 Removed the plaintext fallback when Keystore encryption is unavailable. New writes require

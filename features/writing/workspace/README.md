@@ -99,3 +99,32 @@ owners/explicit close, and unchanged content does not rewrite its PNG. Save/prev
 reported on resume and can be retried. The page remains open for returning to Notes.
 This is bounded lifecycle work, not an always-running service: Android force-stop/process death
 before a checkpoint completes cannot be promised to finish its JavaScript work.
+
+## Page attachments
+
+Notes supplies one expanded-toolbar Attach action. It opens a small anchored menu for images,
+audio, files, web links and arranging existing objects. Compact mode keeps five writing actions,
+with Format with AI in Zoom's former slot; Zoom remains in expanded mode. The expanded rail uses
+one column whenever its fixed controls fit, otherwise two columns, with no rail scrolling.
+
+Attachments use the existing page-object geometry, history, movement and resize owners. Image
+resizing preserves aspect; images and their page-local ink move together. Audio is a small
+play/pause card with elapsed/total time; selecting an object exposes the existing manipulation
+controls. Link cards open in the system browser; other file cards use Android's associated app.
+
+The app copies user-picked files into the active data root's content-addressed `attachments/`
+store; sidecars save only IDs and display metadata. Copies of pages and Undo retain those IDs.
+Deleting a page object deliberately does not delete a shared resource needed by another page or
+history. Include the attachments directory when moving/backing up the Notes data root. Images
+are decoded with orientation support and optimized to at most 1600 pixels on the longest side;
+other files are copied as-is, capped at 100 MiB. No broad new storage or microphone permission.
+
+Images load once per workspace. Saved-page export and thumbnails await decoding and embed the
+pixels, so image sharing does not depend on external URLs. Ordinary writing retains unchanged
+image/widget DOM. Opening the picker checkpoints and uses the existing dialog handoff; late
+results cannot insert into a closed/reopened/different page. No daemon lifecycle or waveform
+policy changes. Native audio uses async preparation and audio focus, and releases on background
+or close. Timer status is cached without DOM changes while the daemon owns writing; deliberate
+play/pause state changes use the existing bounded control reconciliation. Pen activation shares
+the checkbox single-owner contract, including temporary-dot cleanup and compatibility-click
+suppression.

@@ -1,6 +1,7 @@
 import type { Sidecar } from '../sidecar/schema';
 import { projectSemantic, type SemanticBlock } from './semanticDocument';
 import { semanticBlocksToMarkdown } from './semanticMarkdown';
+import { webLink } from './pageAttachments';
 
 /** Portable text only. Ink/layout remain in the notebook, never in the shared text. */
 export function notebookSheetsToMarkdown(sheets: {source:string;sidecar:Sidecar|undefined}[]):string {
@@ -19,6 +20,11 @@ export function notebookSheetsToMarkdown(sheets: {source:string;sidecar:Sidecar|
     const boxes=sheet.sidecar?.textBoxes??[];
     const entries:( {y:number;block:SemanticBlock}|{y:number;source:string;id:string})[]=blocks.map(block=>({block,y:Math.min(...boxes.filter(box=>(box.semantic?.id??`text-page-${page}-${box.id}`)===block.id).map(box=>box.y))}));
     for(const object of sheet.sidecar?.pageObjects??[])if(object.kind==='markdown'&&object.markdown)entries.push({y:object.y,source:object.markdown.source,id:object.markdown.id});
+    for(const object of sheet.sidecar?.pageObjects??[])if(object.kind==='link'&&object.link){
+      const url=webLink(object.link.url);
+      const title=(object.link.title||url||'Link').replace(/[\\[\]]/g,'\\$&').replace(/[\r\n]/g,' ');
+      if(url)entries.push({y:object.y,source:`[${title}](<${url}>)`,id:object.id});
+    }
     entries.sort((a,b)=>a.y-b.y);
     const parts:string[]=source?[source]:[];let batch:SemanticBlock[]=[];
     const flush=()=>{

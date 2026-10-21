@@ -1,9 +1,10 @@
+import { isAttachmentObject } from './pageAttachments';
 import { boundsOfPoints, type InkStroke } from '../ink/types';
 import type { PageObject } from './pageObjects';
 
 /** A white shape is a free ink owner, not a ruled lane. Coordinates stay relative
  * to its top-left so movement never re-groups letters or changes stroke width. */
-export function isPaperObject(o: PageObject) { return o.kind !== 'line' && o.kind !== 'sketch' && o.paper !== false; }
+export function isPaperObject(o: PageObject) { return o.kind === 'image' || (!isAttachmentObject(o) && o.kind !== 'line' && o.kind !== 'sketch' && o.paper !== false); }
 export function objectContains(o: PageObject, p: {x:number;y:number}) {
  const x=(p.x-o.x)/o.width*100,y=(p.y-o.y)/o.height*100;
  if(x<0||x>100||y<0||y>100)return false;
@@ -16,15 +17,17 @@ export function objectContains(o: PageObject, p: {x:number;y:number}) {
   for(let i=0,j=polygon.length-1;i<polygon.length;j=i++) {const a=polygon[i],b=polygon[j];if((a.y>y)!==(b.y>y)&&x<(b.x-a.x)*(y-a.y)/(b.y-a.y)+a.x)inside=!inside;}
   return inside;
  }
- return o.kind==='rectangle';
+ return o.kind==='rectangle' || isAttachmentObject(o);
 }
 export function objectInkOnPage(o:PageObject):InkStroke[] {
  return (o.ink??[]).map(s=>({...s,points:s.points.map(p=>({...p,x:p.x+o.x,y:p.y+o.y})),bounds:{...s.bounds,x:s.bounds.x+o.x,y:s.bounds.y+o.y}}));
 }
 /** Resize the paper around its content. Do not shrink it through saved handwriting. */
 export function objectMinimumSize(o:PageObject) {
+ if(o.kind==='audio')return {width:180,height:48};
+ if(isAttachmentObject(o) && o.kind!=='image')return {width:220,height:64};
  const b=boundsOfPoints((o.ink??[]).flatMap(s=>s.points),6);
- return {width:Math.max(12,b.x+b.width),height:Math.max(12,b.y+b.height)};
+ return {width:Math.max(o.kind==='image'?48:12,b.x+b.width),height:Math.max(o.kind==='image'?48:12,b.y+b.height)};
 }
 /** Native vectors are drawn over the captured paper. Mask earlier ink against
  * opaque shapes so it cannot leak through their white background. Split paths;
@@ -33,9 +36,9 @@ export function maskObjectInk<T extends {x:number;y:number;pressure?:number}>(po
  if(!points.length)return [];
  const left=Math.min(...points.map(p=>p.x)),top=Math.min(...points.map(p=>p.y));
  const bounds={x:left,y:top,width:Math.max(...points.map(p=>p.x))-left,height:Math.max(...points.map(p=>p.y))-top};
- objects=objects.filter(o=>isPaperObject(o) && o.x<=bounds.x+bounds.width && o.x+o.width>=bounds.x && o.y<=bounds.y+bounds.height && o.y+o.height>=bounds.y);
+ objects=objects.filter(o=>(isPaperObject(o)||isAttachmentObject(o)) && o.x<=bounds.x+bounds.width && o.x+o.width>=bounds.x && o.y<=bounds.y+bounds.height && o.y+o.height>=bounds.y);
  if(!objects.length)return [points];
- const visible=(p:T)=>!objects.some(o=>isPaperObject(o)&&objectContains(o,p));
+ const visible=(p:T)=>!objects.some(o=>(isPaperObject(o)||isAttachmentObject(o))&&objectContains(o,p));
  const paths:T[][]=[];let path:T[]=[];
  const finish=()=>{if(path.length)paths.push(path);path=[];};
  if(points.length===1)return visible(points[0])?[points]:[];

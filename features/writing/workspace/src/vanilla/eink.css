@@ -1754,3 +1754,15 @@ body.magnify-active .vanilla-app.direct-workspace .v-modal {
 .rw-text-box.editable:not(.typing):not([data-template-control]) .rw-text-box-handle,
 .rw-text-box.editable:not(.typing):not([data-template-control]) .rw-text-box-delete,
 .rw-text-box.editable:not(.typing):not([data-template-control]) .rw-text-box-resize { display: none; }
+
+/* The attachment action is a labelled control beside the existing move/resize/delete icons. */
+.vanilla-app .rw-object-actions .rw-attachment-open {
+  width:auto; min-width:82px; padding:7px 10px; font-size:14px; white-space:nowrap;
+}
+
+.rw-audio-card { box-sizing:border-box; width:100%; height:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid #000; border-radius:4px; background:#fff; color:#000; font-family:Arial,sans-serif; overflow:hidden; }
+.rw-audio-details { min-width:0; flex:1; }
+.rw-audio-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; line-height:18px; }
+.rw-audio-time { font-size:12px; line-height:16px; font-variant-numeric:tabular-nums; }
+.vanilla-app .rw-audio-play { pointer-events:auto; display:flex; align-items:center; justify-content:center; flex:0 0 30px; width:30px; min-width:30px; height:34px; min-height:34px; margin:0; padding:3px; border:0; background:#fff; color:#000; }
+.vanilla-app .rw-audio-play svg { width:22px; height:22px; }
