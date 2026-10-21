@@ -165,3 +165,30 @@ it('scribble on an image page keeps one bounded native capture and leaves the im
   expect(mutation.takeRecords().some(r=>[...r.addedNodes,...r.removedNodes].includes(node!))).toBe(false);
  } finally {mutation.disconnect();vi.useRealTimers();}
 });
+
+it('Select taps an image directly, exposes its eight grips, and never creates a lasso on blank paper',async()=>{
+ const {ws,host}=setup();await ws.addAttachment({kind:'image',attachment:asset});ws.setActiveTool('write');
+ host.querySelector<HTMLButtonElement>('[data-action="pointer"]')!.click();
+ expect(ws.usesNativeSelectionPen).toBe(false);
+ expect(host.querySelector('[data-action="pointer"]')?.getAttribute('aria-pressed')).toBe('true');
+ expect(host.querySelector('[data-action="select"]')?.getAttribute('aria-pressed')).toBe('false');
+ pointer(host.querySelector('[data-page-object] .rw-page-object-content')!,'pointerdown',80,80);
+ expect(host.querySelectorAll('.rw-image-handle')).toHaveLength(8);
+ const before={...ws.reflowDoc.pageObjects![0]},content=host.querySelector('[aria-label="Move attachment"]')!;
+ pointer(content,'pointerdown',80,80);pointer(content,'pointermove',70,120);pointer(content,'pointerup',70,120);
+ expect(ws.reflowDoc.pageObjects![0]).toMatchObject({x:before.x-10,y:before.y+40});
+ pointer(ws.containerElement,'pointerdown',5,5);pointer(ws.containerElement,'pointermove',20,20);pointer(ws.containerElement,'pointerup',20,20);
+ expect(host.querySelectorAll('.rw-image-handle')).toHaveLength(0);
+ expect(ws.getNativeInkStrokes()).toHaveLength(0);expect((ws as any).selectionLassoPoints).toEqual([]);
+ host.querySelector<HTMLButtonElement>('[data-action="select"]')!.click();
+ expect(ws.usesNativeSelectionPen).toBe(true);
+ expect(host.querySelector('[data-action="select"]')?.getAttribute('aria-pressed')).toBe('true');
+});
+
+it('switching from a moved lasso selection to Select refreshes attachment hit targets',async()=>{
+ const {ws,host}=setup();await ws.addAttachment({kind:'image',attachment:asset});ws.setActiveTool('select');
+ (ws as any).selectionInteraction=true;(ws as any).nativeInkActive=false;(ws as any).renderOverlay();
+ expect(host.querySelector('.rw-page-object.editable')).toBeNull();
+ host.querySelector<HTMLButtonElement>('[data-action="pointer"]')!.click();
+ expect(host.querySelector('.rw-page-object.editable')).not.toBeNull();
+});

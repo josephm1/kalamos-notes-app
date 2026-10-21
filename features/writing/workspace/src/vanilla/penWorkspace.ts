@@ -321,6 +321,7 @@ export class PenWorkspace {
   private dialogObserver: MutationObserver | null = null;
   // Once selected, objects stay in interactive WebView manipulation until a new lasso is requested.
   private selectionInteraction = false;
+  private directSelection = false;
   private selectedInsertId: string | null = null;
   private selectedTextWord: {boxId:string;index:number} | null = null;
   private selectedTextWords = new Map<string, Set<number>>();
@@ -442,7 +443,7 @@ export class PenWorkspace {
   private ro: ResizeObserver;
   private attachmentImages: AttachmentImages;
   private destroyed = false;
-  private pageObjectNodes = new Map<string,{object:PageObject;tool:Tool;selected:string|null;native:boolean;source:string|undefined;node:HTMLElement}>();
+  private pageObjectNodes = new Map<string,{object:PageObject;tool:Tool;direct:boolean;selected:string|null;native:boolean;source:string|undefined;node:HTMLElement}>();
   private audioStates = new Map<string, AudioStatus>();
   private attachmentActivations = new Map<string, PenButtonActivation>();
 
@@ -1750,6 +1751,7 @@ export class PenWorkspace {
     this.gesture.mode = active;
 
     if (active === "select") {
+      this.selectedObjectId = null;
       if(this.selectedBlockAt(p.x,p.y)) {
         this.blockDrag={start:p,last:p};return;
       }
@@ -1764,7 +1766,7 @@ export class PenWorkspace {
         this.renderOverlay();this.updateToolbarState();return;
       }
       this.selectedTextWord=null;
-      if (!hit) this.selectionLassoPoints = [p];
+      if (!hit && !this.directSelection) this.selectionLassoPoints = [p];
       dlog("select:down", { hit, x: Math.round(p.x), y: Math.round(p.y) });
       this.selectedInsertId = hit;
       this.gesture.insertId = hit;
@@ -2850,7 +2852,7 @@ export class PenWorkspace {
   }
 
   get usesNativeSelectionPen(): boolean {
-    return (this.tool === "select" && !this.selectionInteraction) || (this.tool === "erase" && this.eraserMode === "lasso");
+    return (this.tool === "select" && !this.selectionInteraction && !this.directSelection) || (this.tool === "erase" && this.eraserMode === "lasso");
   }
 
   setEraserMode(mode: EraseMode | "lasso") {
@@ -3247,6 +3249,7 @@ export class PenWorkspace {
   }
 
   private setTool(tool: Tool) {
+    if (tool !== "select") this.directSelection = false;
     this.settleSpacingGesture(true);
     this.hideEraserTip();
     if (this.nativeModelDirty) {
@@ -3752,9 +3755,17 @@ export class PenWorkspace {
     const eraseBtn = btn("⌫", "eraser", "Eraser", () => this.afterNativeFlush(() => { this.setTool("erase"); this.openEraserSettings(eraseBtn); }), "Eraser", "erase");
     eraseBtn.dataset.tool = "erase";
     core.appendChild(eraseBtn);
-    const selectBtn = btn("□", "lasso", "Tap a word to move, or draw around words to select", () => this.afterNativeFlush(()=>{ this.setTool("select"); this.openLassoSettings(selectBtn); }), "Select or move words", "select");
+    const selectBtn = btn("□", "lasso", "Tap a word to move, or draw around words to select", () => this.afterNativeFlush(()=>{ this.directSelection=false; this.setTool("select"); this.openLassoSettings(selectBtn); }), "Select or move words", "select");
     selectBtn.dataset.tool = "select";
     core.appendChild(selectBtn);
+    const pointerBtn = btn("↖", "pointer", "Tap to select or move an item", () => this.afterNativeFlush(() => {
+      if (this.directSelection && this.tool === "select") { this.openLassoSettings(pointerBtn); return; }
+      this.directSelection = true; this.selectedObjectId = null;
+      this.setTool("select");
+    }), "Select item", "pointer");
+    pointerBtn.innerHTML=inkToolIcon('pointer'); pointerBtn.classList.add('toolbar-icon-button');
+    pointerBtn.dataset.tool="select"; pointerBtn.dataset.label="Select";
+    core.append(pointerBtn);
 
     this.copyBtn = btn("⧉", "copy", "Copy selected words", () => this.afterNativeFlush(()=>this.duplicateSelectedInk()), "Copy selected words", "copy");
     this.copyBtn.className = "copy-ink";
@@ -3874,7 +3885,7 @@ export class PenWorkspace {
         return;
       }
       const navigation = compactCore.filter(el => el.classList.contains("toolbar-page-button") || el.classList.contains("toolbar-page-overview"));
-      const tools = [writeBtn, ...colorSlots, eraseBtn, selectBtn, spacingBtn, magnifyBtn, textBtn, shapes,
+      const tools = [writeBtn, ...colorSlots, eraseBtn, selectBtn, pointerBtn, spacingBtn, magnifyBtn, textBtn, shapes,
         keyboardBtn, ...compactRail.filter(el => (el as HTMLElement).dataset.action?.startsWith("document-action")), undoBtn, redoBtn,
         this.copyBtn!, this.deleteBtn!, this.convertBtn!];
       for (const tool of [writeBtn, eraseBtn, selectBtn]) {
@@ -4090,7 +4101,7 @@ export class PenWorkspace {
     const native=!!(this.nativeInkActive && !this.nativeWebHandoff && !this.nativeDialogHandoff && !this.magnifyWebViewMode);
     for (const [index, object] of (this.doc.pageObjects ?? []).entries()) {
       const cached=this.pageObjectNodes.get(object.id),source=this.attachmentImages.source(object);
-      if(cached && cached.object===object && cached.tool===this.tool && cached.selected===this.selectedObjectId && cached.native===native && cached.source===source){
+      if(cached && cached.object===object && cached.tool===this.tool && cached.direct===this.directSelection && cached.selected===this.selectedObjectId && cached.native===native && cached.source===source){
         // Appending an already mounted image detaches/reinserts its decoded layer and damages
         // its whole footprint during a local text erase. Retain both the node and its parentage.
         const z=String(4+index); if(cached.node.style.zIndex!==z)cached.node.style.zIndex=z;
@@ -4099,7 +4110,7 @@ export class PenWorkspace {
       }
       cached?.node.remove();
       const node = document.createElement("div"); node.className = "rw-page-object";
-      this.pageObjectNodes.set(object.id,{object,tool:this.tool,selected:this.selectedObjectId,native,source,node});
+      this.pageObjectNodes.set(object.id,{object,tool:this.tool,direct:this.directSelection,selected:this.selectedObjectId,native,source,node});
       node.dataset.pageObject = object.id; node.style.zIndex=String(4+index);
       const paint = (value: PageObject) => {
         node.style.left = `${value.x}px`; node.style.top = `${value.y}px`;
@@ -4118,11 +4129,11 @@ export class PenWorkspace {
       };
       const content = document.createElement("div"); content.className = "rw-page-object-content"; node.append(content);
       paint(object);
-      if (this.tool === "objects") {
+      if (this.tool === "objects" || this.tool === "select" && this.directSelection) {
         node.classList.add("editable");
         if (this.selectedObjectId !== object.id) {
           node.classList.add("unselected");
-          content.addEventListener("pointerdown", e => { e.stopPropagation(); e.preventDefault(); this.selectedObjectId = object.id; this.renderOverlay(); });
+          content.addEventListener("pointerdown", e => { e.stopPropagation(); e.preventDefault(); this.selectedObjectId = object.id; this.selectedInsertId=null; this.selectedTextWord=null; this.selectedTextWords.clear(); this.renderOverlay(); this.updateToolbarState(); });
           this.containerEl.append(node); continue;
         }
         const controls = document.createElement("div"); controls.className = "rw-object-actions";
@@ -4306,8 +4317,8 @@ export class PenWorkspace {
   private openLassoSettings(anchor:HTMLElement) {
     this.closePenSettings(false);
     const panel=document.createElement("div"); panel.className="pen-settings-panel rw-tool-menu rw-lasso-settings";
-    panel.setAttribute("role","dialog");panel.setAttribute("aria-label","Lasso settings");
-    const title=document.createElement("strong");title.textContent="Lasso";panel.append(title);
+    panel.setAttribute("role","dialog");panel.setAttribute("aria-label",this.directSelection?"Selection settings":"Lasso settings");
+    const title=document.createElement("strong");title.textContent=this.directSelection?"Selection":"Lasso";panel.append(title);
     const action=(label:string,icon:string,callback:()=>void,disabled=false)=>{
       const button=document.createElement("button");button.innerHTML=inkToolIcon(icon);
       const caption=document.createElement("span");caption.textContent=label;button.append(caption);
@@ -4315,7 +4326,7 @@ export class PenWorkspace {
       bindPenButton(button,()=>this.afterNativeFlush(()=>{this.closePenSettings();callback();}));panel.append(button);
     };
     action("Select words","lasso",()=>{
-      this.selectionInteraction=false;
+      this.directSelection=false; this.selectionInteraction=false;
       this.selectedInsertId=null;this.selectedTextWord=null;this.selectedTextWords.clear();
       this.setTool("select");
     },false);
@@ -4689,12 +4700,12 @@ export class PenWorkspace {
     const buttons = Array.from(this.toolbarEl.querySelectorAll("button"));
     for (const b of buttons) {
       const tool = b.dataset.tool as Tool | undefined;
-      if (tool === "select") {
+      if (tool === "select" && b.dataset.action !== "pointer") {
         const glyph=this.selectionInteraction?"move":"lasso";
         if(b.dataset.selectionGlyph!==glyph){b.innerHTML=inkToolIcon(glyph);b.dataset.selectionGlyph=glyph;}
         b.classList.add("toolbar-icon-button");
         b.title=this.selectionInteraction?"Move selected words; tap for selection actions":"Draw a lasso to select words";
-        b.dataset.label=this.selectionInteraction ? "Move" : "Select";
+        b.dataset.label=this.selectionInteraction ? "Move" : "Lasso";
       }
       if (tool === "write") {
         const style=this.props.prefs.brushStyle??"pen";
@@ -4702,7 +4713,7 @@ export class PenWorkspace {
         b.title=`${style[0].toUpperCase()+style.slice(1)} / pen settings`;
       }
       if (tool) {
-        const isActive = (!this.magnifyPad || tool==="write" || tool==="erase") && !this.keyboard && (this.tool === tool || b.dataset.action === "spacing" && this.tool === "lines");
+        const isActive = (tool !== "select" || (b.dataset.action === "pointer") === this.directSelection) && (!this.magnifyPad || tool==="write" || tool==="erase") && !this.keyboard && (this.tool === tool || b.dataset.action === "spacing" && this.tool === "lines");
         b.classList.toggle("active", isActive);
         b.setAttribute("aria-pressed", String(isActive));
       }

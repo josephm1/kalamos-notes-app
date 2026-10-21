@@ -1,3 +1,14 @@
+## 21 October 2026 — Direct Select beside Lasso
+
+The pointer button selects words or the topmost page object by pen contact using the existing
+selection/movement engine in WebView mode. It does not ask the daemon to capture a lasso, and
+blank-paper contact creates neither ink nor a selection trail. Image selection exposes the same
+corner/edge grips and delete control. Word selection retains grouping, movement, Undo and the
+shared selection-actions menu (tap Select again). Lasso remains the separate group-selection tool.
+Compact/full toolbar footprints each gain one fixed row; wrapping still depends only on viewport.
+Attachment DOM caches include the direct-selection mode so switching from a moved lasso selection
+cannot reuse an inert image hit target. Owner performs physical pen/e-ink acceptance.
+
 ## 21 October 2026 — Direct attachment picking, image grips and local erase damage
 
 Attach menu rows accept matching pen releases and suppress the same contact's compatibility click.

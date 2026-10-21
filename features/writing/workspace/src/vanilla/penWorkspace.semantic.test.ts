@@ -181,3 +181,18 @@ it('the existing text editor updates marked text atomically and Undo retains the
  expect(box.text).toBe('Buy oat milk');expect(box.styles).toEqual([{start:4,end:12,italic:true}]);
  ws.magnifyUndo();await ws.checkpoint();expect(saved().textBoxes!.find(b=>!b.checkbox)!.styles).toEqual(marked.styles);
 });
+
+it('Select taps and moves a typed word without drawing a lasso and restores it with Undo',()=>{
+ const {ws,host}=open('Buy milk',undefined,false);
+ host.querySelector<HTMLButtonElement>('[data-action="pointer"]')!.click();
+ const words=ws.reflowDoc.textBoxes!.find(b=>!b.checkbox)!;
+ const placed=(ws as any).textBoxWords(words.id).find((w:any)=>w.text==='milk');
+ const x=placed.x+4,y=placed.line*44+20;
+ pointer(ws,'pointerdown',x,y);pointer(ws,'pointermove',x+30,y+44);pointer(ws,'pointerup',x+30,y+44);
+ const moved=(ws as any).textBoxWords(words.id).find((w:any)=>w.text==='milk');
+ expect(moved.x).toBeCloseTo(placed.x+30);expect(moved.line).toBe(placed.line+1);
+ expect(ws.usesNativeSelectionPen).toBe(false);expect((ws as any).selectionLassoPoints).toEqual([]);
+ host.querySelector<HTMLButtonElement>('[data-action="undo"]')!.click();
+ const restored=(ws as any).textBoxWords(words.id).find((w:any)=>w.text==='milk');
+ expect(restored.x).toBe(placed.x);expect(restored.line).toBe(placed.line);
+});

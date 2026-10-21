@@ -6,9 +6,9 @@
 }
 #kalamos-write-workspace-root .pen-workspace { position:relative; padding:12px 12px 20px; }
 #kalamos-write-workspace-root .tool-pill {
-  position:absolute; left:8px; top:min(18vh, calc(100vh - 318px)); z-index:34;
+  position:absolute; left:8px; top:min(18vh, calc(100vh - 362px)); z-index:34;
   display:flex; flex-direction:column; align-items:center; gap:0;
-  width:48px; min-width:48px; height:306px; min-height:306px; max-height:none;
+  width:48px; min-width:48px; height:350px; min-height:350px; max-height:none;
   padding:0; margin:0; flex-shrink:0; flex-wrap:nowrap; overflow:hidden;
   background: #fff; opacity: 1; isolation: isolate; border:1px solid #000; border-radius:7px;
   scrollbar-width:none; -webkit-tap-highlight-color:transparent;
@@ -49,10 +49,10 @@
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-expand {
   order:2; border-top:1px solid #999;
 }
-/* Compact contains five tools. Selection actions live in the Lasso menu, so selecting cannot
+/* Compact contains six tools. Selection actions live in the Lasso menu, so selecting cannot
    add rows or hide Format with AI. Zoom remains in expanded tools. The original button nodes
    and their native flush handlers are reused. */
-#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-core > :not([data-action=write]):not([data-action=erase]):not([data-action=select]),
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-core > :not([data-action=write]):not([data-action=erase]):not([data-action=select]):not([data-action=pointer]),
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > :not([data-action=undo]):not([data-action=document-action]) { display:none !important; }
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=undo],
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=document-action] { display:flex; }
@@ -106,7 +106,7 @@
 #kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-more-rail {
   position:fixed; left:6px; top:64px; bottom:auto;
   display:flex; flex-direction:column; align-items:stretch; gap:0;
-  width:48px; height:662px; max-height:none; padding:0;
+  width:48px; height:706px; max-height:none; padding:0;
   border:1px solid #000; border-radius:6px; background:#fff; overflow:hidden;
   pointer-events:auto; scrollbar-width:none;
 }
@@ -120,7 +120,7 @@
 #kalamos-write-workspace-root .tool-pill.selection-active .toolbar-secondary { display:flex; }
 #kalamos-write-workspace-root .tool-pill::-webkit-scrollbar,
 #kalamos-write-workspace-root .tool-pill > *::-webkit-scrollbar { display:none; }
-@media(max-height:725px) {
+@media(max-height:769px) {
   #kalamos-write-workspace-root .tool-pill.toolbar-all-tools > .toolbar-more-rail {
     display:grid; grid-template-columns:repeat(2,46px); grid-auto-rows:44px; width:94px; height:354px;
   }

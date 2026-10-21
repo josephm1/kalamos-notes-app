@@ -1,6 +1,7 @@
 /** Small, monochrome tool glyphs share currentColor so selected controls invert cleanly. */
 export function inkToolIcon(kind:string):string {
  const paths:Record<string,string>={
+  pointer:'<path d="M5 3l14 10-7 1-3 7-4-18z"/>',
   prev:'<path d="M15 4l-8 8 8 8"/>',
   next:'<path d="M9 4l8 8-8 8"/>',
   back:'<path d="M9 5L3 11l6 6M3 11h11a6 6 0 010 12"/>',

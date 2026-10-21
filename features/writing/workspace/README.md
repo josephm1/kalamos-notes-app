@@ -103,9 +103,13 @@ before a checkpoint completes cannot be promised to finish its JavaScript work.
 ## Page attachments
 
 Notes supplies one expanded-toolbar Attach action. It opens a small anchored menu for images,
-audio, files, web links and arranging existing objects. Compact mode keeps five writing actions,
+audio, files, web links and arranging existing objects. Compact mode keeps six writing actions,
 with Format with AI in Zoom's former slot; Zoom remains in expanded mode. The expanded rail uses
 one column whenever its fixed controls fit, otherwise two columns, with no rail scrolling.
+
+Select (the pointer beside Lasso) taps words or the topmost page object directly. Drag a selected
+word to move it, or use image grips. Tapping Select again opens selection actions; drawing on blank
+paper in this mode creates neither ink nor a lasso. Lasso retains group selection.
 
 Attachments use the existing page-object geometry, history, movement and resize owners. Image
 corner grips preserve the current aspect ratio, edge grips resize one axis, and the image centre
