@@ -87,6 +87,8 @@ interface Window {
     loadAttachmentImage?:(attachment:import('../editor/pageAttachments').Attachment)=>Promise<string>;
     activateAttachment?:(object:import('../editor/pageObjects').PageObject)=>void;
     attachmentError?:(message:string)=>void;
+    selectionError?:(message:string)=>void;
+    shareSelection?:(notebookId:string,markdown:string)=>void;
     notebookToolbar?:boolean;onDocumentClosed?:(notebookId:string)=>void;onDocumentOpened?:(notebookId:string)=>void;documentActions?: import("../vanilla/documentActions").DocumentAction<[notebookId: string]>[]};
   KalamosWriteWorkspace?: import("./entry").KalamosWriteWorkspaceApi;
   KalamosToolbarIcons?: {

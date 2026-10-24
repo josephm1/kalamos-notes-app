@@ -535,6 +535,9 @@
     finally {backgroundChecks.delete(id)}
   }
   window.KalamosNotesAgora={shareNote,workWithAgora,attachToChat,back,options:function(){if(session?.notebookId)void workWithAgora({notebookId:session.notebookId})},choose:function(){void choose().catch(error=>notify(error.message))}}
-  window.KalamosWritingHost={notebookToolbar:true,onDocumentOpened:function(id){backgroundNotebook=id;backgroundReplays.clear();void checkBackgroundResult(id)},onDocumentClosed:function(id){if(backgroundNotebook===id){backgroundNotebook=null;if(!busy)backgroundStatus(null);if(backgroundTimer)clearTimeout(backgroundTimer);backgroundTimer=null}AB.call('notes.agora.releaseEditor',{notebookId:id})},documentActions:[{shortLabel:'Format with AI',label:'Format with AI',options:[{label:'Format this page',icon:'newNote',onPress:beginBackgroundPreparation,run:id=>void formatWithAI(id)},{label:'Format this whole notebook',icon:'grid',onPress:beginNotebookPreparation,run:id=>void formatWithAI(id)}]},{shortLabel:'Share',label:'Share',icon:'share',run:id=>void shareNote(id)}]}
+  window.KalamosWritingHost={notebookToolbar:true,selectionError:notify,shareSelection:function(id,markdown){
+    const title=(libraryData.notebooks||[]).find(note=>note.notebookId===id)?.title || 'Selected text'
+    void call('notes.share.markdown',{title,text:markdown}).catch(error=>notify(error.message))
+  },onDocumentOpened:function(id){backgroundNotebook=id;backgroundReplays.clear();void checkBackgroundResult(id)},onDocumentClosed:function(id){if(backgroundNotebook===id){backgroundNotebook=null;if(!busy)backgroundStatus(null);if(backgroundTimer)clearTimeout(backgroundTimer);backgroundTimer=null}AB.call('notes.agora.releaseEditor',{notebookId:id})},documentActions:[{shortLabel:'Format with AI',label:'Format with AI',options:[{label:'Format this page',icon:'newNote',onPress:beginBackgroundPreparation,run:id=>void formatWithAI(id)},{label:'Format this whole notebook',icon:'grid',onPress:beginNotebookPreparation,run:id=>void formatWithAI(id)}]},{shortLabel:'Share',label:'Share',icon:'share',run:id=>void shareNote(id)}]}
 
 })()

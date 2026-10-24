@@ -72,6 +72,8 @@ export type CreateAppOptions = {
   loadAttachmentImage?: (attachment: Attachment) => Promise<string>;
   onActivateAttachment?: (object: PageObject) => void;
   onAttachmentError?: (message: string) => void;
+  onShareSelection?: (markdown: string) => void;
+  onSelectionError?: (message: string) => void;
   notebookToolbar?: boolean;
   documentActions?: DocumentAction[];
   pageTools?: WorkspacePageTools;
@@ -337,6 +339,8 @@ export function createApp(host: HTMLElement, opts: CreateAppOptions): VanillaApp
       loadAttachmentImage: opts.loadAttachmentImage,
       onActivateAttachment: opts.onActivateAttachment,
       onAttachmentError: opts.onAttachmentError,
+      onShareSelection: opts.onShareSelection,
+      onSelectionError: opts.onSelectionError,
       onLayoutChanged: hooks?.onWorkspaceLayout,
       onContentRegionChange: hooks?.onWorkspaceContentRegion,
       onToolChange: hooks?.onWorkspaceTool,

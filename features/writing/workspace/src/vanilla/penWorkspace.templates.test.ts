@@ -195,14 +195,12 @@ it('requests pagination only at completion of a positive line operation, not ord
   expect(requested).toEqual([672]);
 });
 
-it('selection and eraser pop-outs retain accessible, pen-friendly actions',()=>{
- const {host}=open('ruled');click(host,'Select or move words');
- const panel=host.querySelector('[aria-label="Lasso settings"]')!;
- expect(panel.querySelector('[aria-label="Copy selection"]')?.hasAttribute('disabled')).toBe(true);
- expect(panel.querySelectorAll('svg').length).toBe(3);
- click(host,'Select words');expect(host.querySelector('[aria-label="Lasso settings"]')).toBeNull();
+it('Lasso starts capture directly while eraser options retain their pen-friendly menu',()=>{
+ const {host,ws}=open('ruled');click(host,'Select or move words');
+ expect(host.querySelector('.rw-lasso-settings')).toBeNull();expect(ws.usesNativeSelectionPen).toBe(true);
  click(host,'Eraser');expect(host.querySelector('[aria-label="Stroke eraser"] svg')).not.toBeNull();
  click(host,'Erasing lasso');expect(host.querySelector('[aria-label="Erasing lasso"]')?.getAttribute("aria-pressed")).toBe("true");
+ expect(ws.usesNativeSelectionPen).toBe(true);
 });
 
 it('finger and pen outside settings dismiss without requiring a Done button',()=>{

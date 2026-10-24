@@ -16,6 +16,9 @@ export function inkToolIcon(kind:string):string {
   eraser:'<path d="M3 14l10-11 8 7-10 11H8l-5-7zM8 9l8 7M11 21h10"/>',
   lasso:'<path d="M19 17c2-2 3-5 2-7-2-6-17-7-19 0-2 7 7 11 12 8 5-3 1-7-3-5-4 2-2 7 3 9" stroke-dasharray="2 2"/>',
   check:'<path d="M4 12l5 5L20 5"/>',
+  paste:'<rect x="5" y="5" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="5" rx="1"/>',
+  cut:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8 8l13 13M8 16L21 3"/>',
+  share:'<path d="M12 16V2M7 7l5-5 5 5M5 11v11h14V11"/>',
   copy:'<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
   delete:'<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/>'
  };

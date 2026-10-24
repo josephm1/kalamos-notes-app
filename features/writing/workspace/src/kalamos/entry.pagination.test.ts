@@ -43,7 +43,11 @@ it('completed line insertion publishes separate sheets, turns to them and reopen
   expect(ink).toHaveLength(1);expect(ink[0].strokes[0].points).toEqual(points);
   expect(ink[0].strokes[0].brushStyle).toBe('brush');expect(ink[0].layoutY).toBeLessThan(336);
   expect(headings).toEqual(['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']);
-  expect(document.querySelector('[data-text-box-word]')?.textContent).toContain('Monday');
+  expect(parsePages(files.get(PAGES_FILE)!).active).toBe(1);
+  expect(document.querySelector('[data-text-box-word]')?.textContent).toContain('Wednesday');
+  document.querySelector<HTMLButtonElement>('[aria-label="Previous page"]')!.click();
+  await vi.waitFor(()=>expect(parsePages(files.get(PAGES_FILE)!).active).toBe(0));
+  await vi.waitFor(()=>expect(document.querySelector('[data-text-box-word]')?.textContent).toContain('Monday'));
   document.querySelector<HTMLButtonElement>('[aria-label="Next page"]')!.click();
   await vi.waitFor(()=>expect(parsePages(files.get(PAGES_FILE)!).active).toBe(1));
   await vi.waitFor(()=>expect(document.querySelector('[data-text-box-word]')?.textContent).toContain('Wednesday'));

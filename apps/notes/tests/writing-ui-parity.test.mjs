@@ -32,11 +32,11 @@ test('shared monochrome glyphs render actual SVG in Notes', () => {
 
 test('compact toolbar exposes Add page and horizontal spacing without exposing expanded tools',()=>{
   const actions=['write','erase','select','pointer','page-add','page--1','page-1','pages']
-  const rail=['undo','redo','spacing','document-action','document-action-1','magnify','insert-text']
+  const rail=['paste','undo','redo','spacing','document-action','document-action-1','magnify','insert-text']
   const buttons=items=>items.map(action=>`<button data-action="${action}" class="${rail.includes(action)?'toolbar-more':''}"></button>`).join('')
   const dom=new JSDOM(`<style>${read('features/writing/workspace/src/vanilla/eink.css')}\n${read('features/writing/workspace/src/kalamos/notes-writing-ui.css')}</style><div id="kalamos-write-workspace-root"><div class="tool-pill"><div class="toolbar-core">${buttons(actions)}</div><div class="toolbar-more-rail">${buttons(rail)}</div></div></div>`)
   try {
-    for(const action of ['write','erase','select','pointer','page-add','undo','spacing','document-action'])assert.notEqual(dom.window.getComputedStyle(dom.window.document.querySelector(`[data-action="${action}"]`)).display,'none',action)
+    for(const action of ['write','erase','select','pointer','page-add','undo','spacing','paste','document-action'])assert.notEqual(dom.window.getComputedStyle(dom.window.document.querySelector(`[data-action="${action}"]`)).display,'none',action)
     for(const action of ['page--1','page-1','pages','redo','document-action-1','magnify','insert-text'])assert.equal(dom.window.getComputedStyle(dom.window.document.querySelector(`[data-action="${action}"]`)).display,'none',action)
   } finally {dom.window.close()}
 })

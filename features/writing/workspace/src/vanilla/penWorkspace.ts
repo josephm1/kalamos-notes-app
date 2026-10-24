@@ -1,3 +1,6 @@
+import { notebookSheetsToMarkdown } from "../editor/notebookMarkdown";
+import { createEmptySidecar } from "../sidecar/schema";
+import { writeSelectionClipboard, readSelectionClipboard, hasSelectionClipboard } from "../editor/selectionClipboard";
 import type { DocumentAction } from "./documentActions";
 import { IMAGE_HANDLES, resizeImage, type ImageHandle } from "../editor/imageResize";
 import { audioCard, updateAudioCard } from "./audioCard";
@@ -126,6 +129,8 @@ export type PenWorkspaceProps = {
   loadAttachmentImage?: (attachment: Attachment) => Promise<string>;
   onActivateAttachment?: (object: PageObject) => void;
   onAttachmentError?: (message: string) => void;
+  onShareSelection?: (markdown: string) => void;
+  onSelectionError?: (message: string) => void;
   documentActions?: DocumentAction[];
   pageTools?: WorkspacePageTools;
   block: Block;
@@ -1684,7 +1689,7 @@ export class PenWorkspace {
       return {...ins,freeX:visual.x+dx,freeY:visual.y+dy,
         afterWord:this.readingSlotAt(visual.x+dx,visual.y+dy+visual.height/2)};
     });
-    this.doc={...this.doc,textBoxes,inserts};this.relayout();this.props.onLayoutChanged?.();
+    this.doc={...this.doc,textBoxes:synchronizeTaskControls(textBoxes),inserts};this.relayout();this.props.onLayoutChanged?.();
   }
 
   /** Word units use exact text ranges, including fragments of a long wrapped token. */
@@ -2140,6 +2145,7 @@ export class PenWorkspace {
       this.updateToolbarState();
     }
     this.setSettingsDismissGesture(false);
+    if(this.tool==='select' && !this.directSelection && this.selectionInteraction && !this.selectedInsertId && !this.selectedTextWords.size)this.startLasso();
   };
 
   // ---- Per-tool actions shared by the pointer gestures (live drags) and
@@ -2324,14 +2330,16 @@ export class PenWorkspace {
     );
   }
 
+  private spacingPageHeight = 0;
   private startLines(afterWord: number, scopeLine: number, preferredId?: string) {
+    this.spacingPageHeight = this.containerEl.clientHeight;
     const session = this.beginSpacing("line", afterWord, scopeLine, 0, preferredId);
     return { id: session.id, prevLines: session.amount };
   }
 
   private finishLines(finalLines: number) {
     this.finishSpacing(finalLines);
-    if (finalLines > 0) this.requestOverflowPagination();
+    if (finalLines > 0) this.requestOverflowPagination(this.spacingPageHeight);
   }
 
   /** Pagination is a deliberate document operation, not a per-stroke/layout observer. In particular,
@@ -3042,6 +3050,74 @@ export class PenWorkspace {
     this.relayout(); this.updateToolbarState();
   }
 
+  private startLasso() {
+    this.directSelection=false; this.selectionInteraction=false;
+    this.selectedInsertId=null; this.selectedTextWord=null; this.selectedTextWords.clear();
+    this.closePenSettings(); this.setTool("select");
+  }
+
+  /** Snapshot exact selected text ranges and vectors before Cut can change the source page. */
+  copySelectedBlocks(cut = false) {
+    const bounds=this.getSelectedBlockBounds(); if(!bounds)return;
+    const ins=this.doc.inserts.find(i=>i.id===this.selectedInsertId && i.kind==='ink');
+    const visual=ins ? this.inkVisualBounds(ins) : null;
+    const textBoxes=this.selectedTextBoxes();
+    try { writeSelectionClipboard({bounds,ink:ins&&visual?{...ins,freeX:visual.x,freeY:visual.y}:undefined,textBoxes}); }
+    catch { this.props.onSelectionError?.('Could not save the clipboard. Your selection is unchanged.'); return; }
+    if(cut)this.deleteSelectedBlocks();
+    this.updateToolbarState();
+  }
+
+  pasteSelection() {
+    const clip=readSelectionClipboard();if(!clip)return;
+    this.pushHistory();
+    const dx=Math.max(0,Math.min(clip.bounds.x,this.width-clip.bounds.width))-clip.bounds.x;
+    const dy=this.containerEl.scrollTop+this.lineHeight-clip.bounds.y;
+    let inserts=this.doc.inserts;
+    this.selectedInsertId=null; this.selectedTextWords.clear(); this.selectedTextWord=null;
+    if(clip.ink){
+      const id=newInsertId('ink');
+      inserts=[...inserts,{...clip.ink,id,freeX:clip.ink.freeX!+dx,freeY:clip.ink.freeY!+dy,
+        afterWord:this.nearestSlot(clip.bounds.x+dx,clip.bounds.y+dy),
+        strokes:clip.ink.strokes.map((stroke,i)=>({...stroke,id:`${id}-${i}`}))}];
+      this.selectedInsertId=id;
+    }
+    const semanticIds=new Map<string,string>();
+    for(const box of clip.textBoxes)if(box.semantic && !semanticIds.has(box.semantic.id))semanticIds.set(box.semantic.id,newInsertId('semantic'));
+    const firstText=new Set<string>();
+    const boxes=clip.textBoxes.map(box=>{
+      const id=newInsertId('text');
+      const words=(box.words??[]).map(word=>({...word,x:word.x+dx,y:word.y+dy}));
+      if(!box.checkbox)this.selectedTextWords.set(id,new Set(words.map((_,i)=>i)));
+      const semantic=box.semantic?{...box.semantic,id:semanticIds.get(box.semantic.id)!,
+        sourceInkRegionIds:undefined,parentId:box.semantic.parentId?semanticIds.get(box.semantic.parentId):undefined,
+        continuation:box.semantic.role==='text' && firstText.has(box.semantic.id)}:undefined;
+      if(box.semantic?.role==='text')firstText.add(box.semantic.id);
+      return {...box,id,blockId:this.props.block.id,semantic,x:words.length?Math.min(...words.map(w=>w.x)):box.x+dx,
+        y:words.length?Math.min(...words.map(w=>w.y)):box.y+dy,words};
+    });
+    this.doc={...this.doc,inserts,textBoxes:[...this.placedTextBoxes(),...boxes]};
+    this.tool='select';this.directSelection=false;this.selectionInteraction=false;
+    this.setTool('select');this.relayout();this.props.onLayoutChanged?.();
+  }
+
+  private selectedTextBoxes() {
+    const textBoxes=this.placedTextBoxes().flatMap(box=>{
+      const indices=this.selectedTextWords.get(box.id);if(!indices?.size||!box.words)return [];
+      const others=new Set(box.words.flatMap((_,i)=>indices.has(i)?[]:[i]));
+      const selected=removeBoxWords(box.text,box.words,others,box.styles);
+      return [{...box,...selected,x:Math.min(...selected.words.map(w=>w.x)),y:Math.min(...selected.words.map(w=>w.y))}];
+    });
+    const ids=new Set(textBoxes.flatMap(box=>box.semantic?[box.semantic.id]:[]));
+    const controls=this.placedTextBoxes().filter(box=>box.checkbox && box.semantic && ids.has(box.semantic.id));
+    return [...textBoxes,...controls];
+  }
+
+  selectedMarkdown(): string {
+    // Handwritten vectors are never OCR'd or silently included in a text share.
+    return notebookSheetsToMarkdown([{source:'',sidecar:{...createEmptySidecar('Selection',''),textBoxes:this.selectedTextBoxes()}}]);
+  }
+
   duplicateSelectedInk() {
     const ins=this.doc.inserts.find(i=>i.id===this.selectedInsertId);
     const visual=ins?.kind==='ink'?this.inkVisualBounds(ins):null;
@@ -3078,9 +3154,9 @@ export class PenWorkspace {
       const remaining=removeBoxWords(box.text,box.words,indices,box.styles);
       return remaining.words.length?[{...box,...remaining}]:[];
     });
-    this.doc={...this.doc,textBoxes,inserts:this.doc.inserts.filter(i=>i.id!==this.selectedInsertId)};
+    this.doc={...this.doc,textBoxes:synchronizeTaskControls(textBoxes),inserts:this.doc.inserts.filter(i=>i.id!==this.selectedInsertId)};
     this.selectedInsertId=null;this.selectedTextWords.clear();this.selectedTextWord=null;
-    this.relayout();this.updateToolbarState();
+    this.relayout();this.startLasso();
   }
 
   private eraseLasso(polygon: InkPoint[]) {
@@ -3776,7 +3852,7 @@ export class PenWorkspace {
     const eraseBtn = btn("⌫", "eraser", "Eraser", () => this.afterNativeFlush(() => { this.setTool("erase"); this.openEraserSettings(eraseBtn); }), "Eraser", "erase");
     eraseBtn.dataset.tool = "erase";
     core.appendChild(eraseBtn);
-    const selectBtn = btn("□", "lasso", "Tap a word to move, or draw around words to select", () => this.afterNativeFlush(()=>{ this.directSelection=false; this.setTool("select"); this.openLassoSettings(selectBtn); }), "Select or move words", "select");
+    const selectBtn = btn("□", "lasso", "Tap a word to move, or draw around words to select", () => this.afterNativeFlush(()=>this.startLasso()), "Select or move words", "select");
     selectBtn.dataset.tool = "select";
     core.appendChild(selectBtn);
     const pointerBtn = btn("↖", "pointer", "Tap to select or move an item", () => this.afterNativeFlush(() => {
@@ -3851,6 +3927,8 @@ export class PenWorkspace {
       documentBtn.dataset.label = action.shortLabel ?? action.label;
       documentBtn.classList.add("toolbar-more"); rail.append(documentBtn);
     }
+    const pasteBtn=btn("Paste","paste","Paste selection",()=>this.afterNativeFlush(()=>this.pasteSelection()),"Paste selection","paste");
+    pasteBtn.innerHTML=inkToolIcon('paste');pasteBtn.classList.add('toolbar-more');pasteBtn.dataset.label='Paste';rail.append(pasteBtn);
     const keyboardBtn = btn(
       "ABC",
       "keyboard",
@@ -3914,7 +3992,7 @@ export class PenWorkspace {
       }
       const navigation = compactCore.filter(el => el.classList.contains("toolbar-page-button") || el.classList.contains("toolbar-page-overview"));
       const tools = [writeBtn, ...colorSlots, eraseBtn, selectBtn, pointerBtn, spacingBtn, magnifyBtn, textBtn, shapes,
-        keyboardBtn, ...compactRail.filter(el => (el as HTMLElement).dataset.action?.startsWith("document-action")), undoBtn, redoBtn,
+        keyboardBtn, pasteBtn, ...compactRail.filter(el => (el as HTMLElement).dataset.action?.startsWith("document-action")), undoBtn, redoBtn,
         this.copyBtn!, this.deleteBtn!, this.convertBtn!];
       for (const tool of [writeBtn, eraseBtn, selectBtn]) {
         tool.dataset.label = tool === writeBtn ? "Pen" : tool === eraseBtn ? "Eraser" : "Select";
@@ -4399,23 +4477,25 @@ export class PenWorkspace {
   private openLassoSettings(anchor:HTMLElement) {
     this.closePenSettings(false);
     const panel=document.createElement("div"); panel.className="pen-settings-panel rw-tool-menu rw-lasso-settings";
-    panel.setAttribute("role","dialog");panel.setAttribute("aria-label",this.directSelection?"Selection settings":"Lasso settings");
-    const title=document.createElement("strong");title.textContent=this.directSelection?"Selection":"Lasso";panel.append(title);
+    panel.setAttribute("role","dialog");panel.setAttribute("aria-label","Selection actions");
+    const title=document.createElement("strong");title.textContent="Selection";panel.append(title);
     const action=(label:string,icon:string,callback:()=>void,disabled=false)=>{
       const button=document.createElement("button");button.innerHTML=inkToolIcon(icon);
       const caption=document.createElement("span");caption.textContent=label;button.append(caption);
       button.setAttribute("aria-label",label);button.disabled=disabled;
       bindPenButton(button,()=>this.afterNativeFlush(()=>{this.closePenSettings();callback();}));panel.append(button);
     };
-    action("Select words","lasso",()=>{
-      this.directSelection=false; this.selectionInteraction=false;
-      this.selectedInsertId=null;this.selectedTextWord=null;this.selectedTextWords.clear();
-      this.setTool("select");
-    },false);
+    action("Select again","lasso",()=>this.startLasso());
     const hasSelection=!!this.selectedInsertId||this.selectedTextWords.size>0;
-    action("Copy selection","copy",()=>this.duplicateSelectedInk(),!hasSelection);
+    action("Copy selection","copy",()=>this.copySelectedBlocks(),!hasSelection);
+    action("Cut selection","cut",()=>this.copySelectedBlocks(true),!hasSelection);
+    action("Paste selection","paste",()=>this.pasteSelection(),!hasSelectionClipboard());
+    action("Duplicate selection","copy",()=>this.duplicateSelectedInk(),!hasSelection);
     action("Delete selection","delete",()=>this.deleteSelectedBlocks(),!hasSelection);
-    if (this.props.hwr) action("Convert selection to text","text",()=>this.convertSelectedToText(),!this.selectedInsertId);
+    if(this.props.onShareSelection && this.selectedTextWords.size)action("Share text","share",()=>{
+      const markdown=this.selectedMarkdown();if(markdown)this.props.onShareSelection?.(markdown);
+    });
+    if (this.props.hwr?.available()) action("Convert selection to text","text",()=>this.convertSelectedToText(),!this.selectedInsertId);
     const selectedBoxId=this.selectedTextWord?.boxId??(this.selectedTextWords.size===1?[...this.selectedTextWords.keys()][0]:undefined);
     if(selectedBoxId)action("Edit text","text",()=>this.editTextBox(selectedBoxId));
     this.root.append(panel);this.penSettingsEl=panel;
@@ -4766,7 +4846,13 @@ export class PenWorkspace {
       this.nativeInkActive=false;
       // Prepare the solid vector frame before the native host detaches its dashed capture surface.
       this.renderOverlay();
+      if(this.props.notebookToolbar)requestAnimationFrame(()=>{
+        if(!this.root.isConnected || this.tool!=='select' || !this.getSelectedBlockBounds())return;
+        const anchor=this.toolbarEl.querySelector<HTMLElement>('[data-action="select"]');
+        if(anchor)this.openLassoSettings(anchor);
+      });
     }
+    this.toolbarEl.querySelector<HTMLButtonElement>('[data-action="paste"]')?.toggleAttribute('disabled',!hasSelectionClipboard());
     this.toolbarEl.classList.toggle("selection-active",hasSelection);
     if (this.props.notebookToolbar) {
       const colours = this.notebookColors();

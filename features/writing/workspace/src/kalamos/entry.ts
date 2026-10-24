@@ -272,7 +272,7 @@ async function paginateCurrentSheet(height: number) {
     const saved = validateSidecar(JSON.parse(readDocSource(id, current.sidecarFile)));
     if (!saved.ok) throw new Error('Cannot read saved sheet for pagination');
     const next = savePaginatedSheet(index, {source:readDocSource(id,current.sourceFile),sidecar:saved.sidecar},
-      height, `overflow-${Date.now().toString(36)}-${overflowSequence++}`, (file,text) => saveNotebookFile(id,file,text));
+      height, `overflow-${Date.now().toString(36)}-${overflowSequence++}`, (file,text) => saveNotebookFile(id,file,text), true);
     if (!next) return;
     // Compatibility metadata is best-effort; the manifest is already authoritative. A shelf
     // metadata failure must not leave the old editor writing into a retired sheet's files.
@@ -437,6 +437,8 @@ function openWorkspaceNotebook(notebookId: string, toolbarMode: "collapsed" | "c
       const load=window.KalamosWritingHost?.loadAttachmentImage;
       return load ? load(attachment) : Promise.reject(new Error('Image attachments are unavailable.'));
     },
+    onSelectionError: message => window.KalamosWritingHost?.selectionError?.(message),
+    onShareSelection: window.KalamosWritingHost?.shareSelection ? markdown => window.KalamosWritingHost?.shareSelection?.(notebookId,markdown) : undefined,
     onActivateAttachment: object => window.KalamosWritingHost?.activateAttachment?.(object),
     onAttachmentError: message => window.KalamosWritingHost?.attachmentError?.(message),
     documentActions: window.KalamosWritingHost?.documentActions?.map(action => bindDocumentAction(action, notebookId)),

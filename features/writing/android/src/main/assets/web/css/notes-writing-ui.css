@@ -6,9 +6,9 @@
 }
 #kalamos-write-workspace-root .pen-workspace { position:relative; padding:12px 12px 20px; }
 #kalamos-write-workspace-root .tool-pill {
-  position:absolute; left:8px; top:min(18vh, calc(100vh - 450px)); z-index:34;
+  position:absolute; left:8px; top:min(18vh, calc(100vh - 494px)); z-index:34;
   display:flex; flex-direction:column; align-items:center; gap:0;
-  width:48px; min-width:48px; height:438px; min-height:438px; max-height:none;
+  width:48px; min-width:48px; height:482px; min-height:482px; max-height:none;
   padding:0; margin:0; flex-shrink:0; flex-wrap:nowrap; overflow:hidden;
   background: #fff; opacity: 1; isolation: isolate; border:1px solid #000; border-radius:7px;
   scrollbar-width:none; -webkit-tap-highlight-color:transparent;
@@ -49,14 +49,15 @@
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-expand {
   order:2; border-top:1px solid #999;
 }
-/* Compact contains eight tools. Selection actions live in the Lasso menu, so selecting cannot
+/* Compact contains nine tools. Selection actions live in the Lasso menu, so selecting cannot
    add rows or hide Format with AI. Zoom remains in expanded tools. The original button nodes
    and their native flush handlers are reused. */
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-core > :not([data-action=write]):not([data-action=erase]):not([data-action=select]):not([data-action=pointer]):not([data-action=page-add]),
-#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > :not([data-action=undo]):not([data-action=document-action]):not([data-action=spacing]) { display:none !important; }
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > :not([data-action=undo]):not([data-action=document-action]):not([data-action=spacing]):not([data-action=paste]) { display:none !important; }
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=undo],
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=document-action],
-#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=spacing] { display:flex !important; }
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=spacing],
+#kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=paste] { display:flex !important; }
 /* Collapsing only hides the tools; keep the same handle footprint and outer chrome. */
 #kalamos-write-workspace-root .tool-pill.toolbar-collapsed {
   height:42px; min-height:42px;

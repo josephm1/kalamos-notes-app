@@ -2699,3 +2699,24 @@ it('AI tap opens the shared small menu and only the selected option starts forma
     expect(notebook).toHaveBeenCalledOnce();
   } finally {ws.destroy();host.remove();}
 });
+
+it('completed lasso reveals contextual actions and restarting capture restores the native selection pen',async()=>{
+ const host=document.createElement('div');document.body.append(host);const share=vi.fn(),tool=vi.fn();
+ const ws=new PenWorkspace(host,{block:parseMarkdown('\u200b')[0],existingRuns:[],
+  existingTextBoxes:[{id:'share-box',blockId:'b0',text:'send this',x:30,y:88,width:200,size:19}],prefs:DEFAULT_PREFERENCES,
+  eink:true,native:true,notebookToolbar:true,onCommit(){},onCancel(){},onShareSelection:share,onToolChange:tool});
+ try{
+  host.querySelector<HTMLButtonElement>('[data-action="select"]')!.click();
+  expect(ws.usesNativeSelectionPen).toBe(true);expect(host.querySelector('.rw-lasso-settings')).toBeNull();
+  ws.applyNativeStroke([{x:20,y:78},{x:240,y:78},{x:240,y:125},{x:20,y:125},{x:20,y:78}].map((point,t)=>({...point,t,pressure:.5})));
+  await vi.waitFor(()=>expect(host.querySelector('.rw-lasso-settings')).not.toBeNull());
+  expect(ws.usesNativeSelectionPen).toBe(false);
+  for(const label of ['Copy selection','Cut selection','Delete selection','Share text'])expect(host.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
+  const button=host.querySelector<HTMLButtonElement>('[aria-label="Share text"]')!;
+  button.dispatchEvent(pointerEvent('pointerdown',9,10,10));button.dispatchEvent(pointerEvent('pointerup',9,10,10));button.click();
+  expect(share).toHaveBeenCalledTimes(1);expect(share.mock.lastCall![0]).toBe('send this');
+  host.querySelector<HTMLButtonElement>('[data-action="select"]')!.click();
+  expect(ws.usesNativeSelectionPen).toBe(true);expect(host.querySelector('.rw-lasso-settings')).toBeNull();expect(ws.getSelectedBlockBounds()).toBeNull();
+  expect(tool).toHaveBeenLastCalledWith('select',false);
+ }finally{ws.destroy();host.remove();}
+});

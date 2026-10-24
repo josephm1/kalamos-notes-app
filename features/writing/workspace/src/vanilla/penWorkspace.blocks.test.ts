@@ -109,6 +109,52 @@ it('switches a native-selected ink group to pointer movement with one separate b
  }));
  expect(ws.usesNativeSelectionPen).toBe(false);
  host.querySelector<HTMLButtonElement>('[aria-label="Select or move words"]')!.click();
- host.querySelector<HTMLButtonElement>('[aria-label="Select words"]')!.click();
  expect(ws.usesNativeSelectionPen).toBe(true);expect(host.querySelector('.rw-selection-box')).toBeNull();
+});
+
+it('cut and paste carry mixed vectors and styled text across editor lifetimes, with independent Undo',async()=>{
+ const {clearSelectionClipboard}=await import('../editor/selectionClipboard');clearSelectionClipboard();
+ const styled={...box,styles:[{start:4,end:8,bold:true}]};
+ const source=setup([styled]);
+ source.ws.placeMagnifiedGroup([{id:'cut-ink',tool:'pen',color:'#1838D8',width:3,points:stroke([[140,94],[170,106]]),bounds:{x:140,y:94,width:30,height:12}}],2);
+ const original=source.ws.getNativeInkStrokes();
+ source.ws.setActiveTool('select');source.ws.selectLasso(lasso);
+ expect(source.ws.selectedMarkdown()).toContain('**milk**');
+ source.ws.copySelectedBlocks(true);
+ expect(words(source.ws)).toHaveLength(0);expect(source.ws.getNativeInkStrokes()).toHaveLength(0);
+ source.host.querySelector<HTMLButtonElement>('[data-action="undo"]')!.click();
+ expect(words(source.ws).map(w=>w.text)).toEqual(['buy','milk']);expect(source.ws.getNativeInkStrokes()).toEqual(original);
+ source.ws.destroy();
+ const target=setup([]);
+ target.host.querySelector<HTMLButtonElement>('[data-action="paste"]')!.click();
+ expect(words(target.ws).map(w=>w.text)).toEqual(['buy','milk']);
+ const pasted=target.ws.getNativeInkStrokes();expect(pasted).toHaveLength(1);expect(pasted[0].color).toBe('#1838D8');
+ expect(target.ws.reflowDoc.inserts.filter(i=>i.kind==='ink')[0].strokes[0].id).not.toBe('cut-ink');expect(target.ws.selectedMarkdown()).toContain('**milk**');
+ expect(target.ws.usesNativeSelectionPen).toBe(false);
+ target.host.querySelector<HTMLButtonElement>('[data-action="undo"]')!.click();
+ expect(words(target.ws)).toHaveLength(0);expect(target.ws.getNativeInkStrokes()).toHaveLength(0);
+ target.host.querySelector<HTMLButtonElement>('[data-action="paste"]')!.click();expect(words(target.ws)).toHaveLength(2);
+ clearSelectionClipboard();
+});
+
+it('clipboard persistence failure leaves a cut selection untouched and reports the failure',()=>{
+ const {ws}=setup([box]);ws.setActiveTool('select');ws.selectLasso(lasso);
+ const before=words(ws);
+ const save=vi.spyOn(Object.getPrototypeOf(localStorage),'setItem').mockImplementation(()=>{throw new Error('quota');});
+ try{ws.copySelectedBlocks(true);expect(words(ws)).toEqual(before);expect(ws.getSelectedBlockBounds()).not.toBeNull();}
+ finally{save.mockRestore();}
+});
+
+it('cut/paste and text sharing preserve task Markdown and checked state without reusing semantic identity',async()=>{
+ const {clearSelectionClipboard}=await import('../editor/selectionClipboard');clearSelectionClipboard();
+ const task:TextBox={...box,text:'buy milk',semantic:{id:'original-task',type:'task',role:'text'},styles:[{start:4,end:8,bold:true}]};
+ const check:TextBox={id:'check',blockId:'',text:'☑',checkbox:true,x:260,y:88,width:36,size:19,semantic:{id:'original-task',type:'task',role:'checkbox'}};
+ const source=setup([task,check]);source.ws.setActiveTool('select');source.ws.selectLasso(lasso);
+ expect(source.ws.selectedMarkdown()).toBe('- [x] buy **milk**');
+ source.ws.copySelectedBlocks(true);expect(source.ws.reflowDoc.textBoxes).toHaveLength(0);
+ const target=setup([]);target.ws.pasteSelection();
+ expect(target.ws.selectedMarkdown()).toBe('- [x] buy **milk**');
+ const pasted=target.ws.reflowDoc.textBoxes!;
+ expect(pasted[0].semantic!.id).not.toBe('original-task');expect(pasted[1].semantic!.id).toBe(pasted[0].semantic!.id);
+ expect(pasted[1].text).toBe('☑');clearSelectionClipboard();
 });

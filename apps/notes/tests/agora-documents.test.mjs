@@ -578,3 +578,12 @@ test('notebook menu option processes original pages sequentially with fresh revi
   assert.equal(h.w.localStorage.getItem('notes.ai.notebookPages.note'),null)
  }finally{h.dom.window.close()}
 })
+
+test('selected Markdown uses the Android text share route without image export or AI',async()=>{
+ const h=harness();try{
+  h.w.KalamosWritingHost.shareSelection('note','**Selected** text\n\n- one');await settle();
+  const request=h.calls.find(c=>c.method==='notes.share.markdown');assert.ok(request);
+  assert.equal(request.args.text,'**Selected** text\n\n- one');
+  assert.equal(h.calls.some(c=>c.method==='notes.ai.processImage'||c.method==='notes.agora.export'),false);
+ }finally{h.dom.window.close()}
+})

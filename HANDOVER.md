@@ -1,3 +1,35 @@
+## 25 October 2026 — Selection actions, cross-page clipboard and spacing overflow
+
+Lasso now enters capture directly, without opening a settings pop-out over the first stroke.
+Restarting it clears the old move/direct-selection state before selecting the existing native
+dashed selection pen, matching erasing-lasso ownership. Successful selection reveals a contextual
+menu automatically: Copy, Cut, Paste, Duplicate, Delete, and Share text for typed/Markdown words.
+Native selection still hands off to WebView movement after the completed batch. No vendor input,
+waveform, capture queue, refresh timing or daemon lifecycle implementation changed.
+
+A fixed Paste control is available in compact/full tools, disabled without clipboard content.
+The writing-owned clipboard is verified in private WebView storage before Cut removes anything;
+page changes/editor destruction and process recreation retain it. A failed write leaves the source
+selection untouched and reports an error. Paste clones identities and preserves vector appearance,
+selected word placements, inline styles and semantic task/heading data; task checkbox identity and
+state move with their owner. Cut and Paste each use the existing page-local Undo while that editor remains open.
+The clipboard persists until replaced, and its contents never belong in Git or device captures
+uploaded to the repository. Sharing uses the existing Notes-owned Android text/plain Markdown
+chooser, including the selected words' marks/structure; handwriting is not OCR'd or sent as text.
+
+Positive vertical spacing uses the pre-gesture viewport height for pagination. The immutable split
+still publishes complete files before the manifest and retains the original files; it now activates
+the first new continuation page so the displaced rows are immediately visible. Other manual pages
+remain ordered and untouched. Existing tests cover metadata, original vector identity and reopening.
+
+Validation: writing751/typecheck/Android regeneration and Notes web133 passed. Notes native99
+(one skipped) and shared runtime61 passed. Standard and Bigme debug APKs build; installed the Bigme
+build via adb install -r, preserving app data, and verified installed SHA256:
+3ac58b9ed1f2b7aab505c3616db1d7da66f64b43b12dad11641188a6c209bdfc. Installed runtime inspection
+confirmed normal/restarted Lasso requests the selection pen, has an attached native session, and
+opens no preliminary menu; erasing lasso requests the same pen type. The Paste control is visible.
+Owner is performing physical pen/e-ink acceptance; screenshots do not certify it.
+
 ## 24 October 2026 — Compact controls, movable tab and AI scope
 
 Compact Notes exposes Add page and one-tap horizontal spacing. Expanded tools close directly to

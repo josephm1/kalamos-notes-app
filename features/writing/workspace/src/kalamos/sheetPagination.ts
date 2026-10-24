@@ -5,7 +5,7 @@ import { PAGES_FILE, replaceWithContinuations, type WorkspacePages } from './wor
  * original: interruption/save failure leaves it authoritative, with all ink and Markdown intact.
  * This is deliberately outside the pen hot path and uses the normal retained page-turn handoff. */
 export function savePaginatedSheet(index: WorkspacePages, content: SheetContent, height: number,
-  generation: string, save: (file: string, text: string) => string): WorkspacePages | null {
+  generation: string, save: (file: string, text: string) => string, followOverflow = false): WorkspacePages | null {
   const lineHeight = content.sidecar.layoutLineHeight ?? 56;
   const visibleHeight = Math.floor(height / lineHeight) * lineHeight;
   // Retain saved sheet geometry when more room becomes available, but never let an older
@@ -20,6 +20,7 @@ export function savePaginatedSheet(index: WorkspacePages, content: SheetContent,
     if (save(page.sourceFile, parts[i].source) !== 'ok' ||
       save(page.sidecarFile, JSON.stringify(parts[i].sidecar)) !== 'ok') throw new Error('Cannot save overflow sheet');
   }
+  if (followOverflow) next.active = index.active + 1;
   if (save(PAGES_FILE, JSON.stringify(next)) !== 'ok') throw new Error('Cannot publish overflow sheets');
   return next;
 }
