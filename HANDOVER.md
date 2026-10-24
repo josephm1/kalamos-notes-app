@@ -5,7 +5,9 @@ the collapsed tab. The collapsed tab arms movement after a 400ms hold; the open 
 six-pixel drag threshold. Both accept pen/touch, keep the existing flush-before-handoff and final
 bounded capture, and suppress the drag's delayed compatibility click. Toolbar position is a shared
 writing preference restored on page changes/reopen and clamped to available geometry. Expanded
-chrome ignores floating offsets. No daemon cadence, capture queue or waveform changes.
+chrome ignores floating offsets. The collapsed tab and open compact grip now share the open
+menu’s 48px outer width, 46×40px handle, full outline and 7px corner radius; only the tool rows
+are hidden. Removed the old narrow/tall tab sizing and edge-only position override. No daemon cadence, capture queue or waveform changes.
 
 Tapping Format with AI opens the same measured small menu used by the pen tools, with exactly
 “Format this page” and “Format this whole notebook”. Selection pins the page before the native flush;
@@ -32,8 +34,10 @@ Notebook 1. Imported numbered titles still prevent collisions.
 Validation: writing745/typecheck/Android regeneration; Notes web132; Notes native99 (one skipped)
 and shared runtime61 passed. Standard and Bigme debug APKs build. Installed the Bigme build with
 adb install -r, preserving app data, and verified its installed SHA256:
-1254e521d99bc20e1a71ac6e415736d8af23352ec4305274a6484d554832944c. Local ADB screenshots and WebView inspection verify the complete
+0196ed3fd49de76d2df4a056046731193a67e240417961dc174ffa8f09c90b10. Local ADB screenshots and WebView inspection verify the complete
 floating-tab border and two-option AI menu with outline icons; opening it starts no formatting.
+A subsequent installed-device check verifies equal collapsed/open compact handle dimensions
+(46×40 CSS px), outer width (48 CSS px), position, outline and corner radius.
 Physical pen latency, retained panel appearance and gesture acceptance remain owner-run.
 
 ## 21 October 2026 — Delayed erase flash resolved: per-client idle recommit

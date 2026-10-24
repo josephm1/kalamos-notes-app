@@ -57,13 +57,11 @@
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=undo],
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=document-action],
 #kalamos-write-workspace-root .tool-pill:not(.toolbar-all-tools) > .toolbar-more-rail > [data-action=spacing] { display:flex !important; }
+/* Collapsing only hides the tools; keep the same handle footprint and outer chrome. */
 #kalamos-write-workspace-root .tool-pill.toolbar-collapsed {
-  left:-1px !important; width:38px; min-width:38px; height:50px; min-height:50px;
-  padding:0; border-left:0; border-radius:0 8px 8px 0; overflow:hidden;
+  height:42px; min-height:42px;
 }
-#kalamos-write-workspace-root .tool-pill.toolbar-collapsed .toolbar-handle {
-  width:36px; min-width:36px; height:48px; min-height:48px; padding:6px; border:0;
-}
+#kalamos-write-workspace-root .tool-pill.toolbar-collapsed .toolbar-handle { border-bottom:0; }
 
 /* Expanded chrome: one header and one fixed rail. Only an explicit viewport/Zoom layout
    changes the rail arrangement; writing, tool activation and menu opening never resize it. */
@@ -193,9 +191,7 @@ body.magnify-active #kalamos-write-workspace-root .v-modal.toolbar-mode-full .pe
 #kalamos-write-workspace-root .scribe-menu button:focus-visible { outline:1px solid #000; outline-offset:-2px; }
 #kalamos-write-workspace-root .scribble-erase-toggle { min-height:44px; width:100%; padding:8px 10px; font-size:16px; }
 
-#kalamos-write-workspace-root .tool-pill.toolbar-collapsed.toolbar-positioned {
-  left:var(--toolbar-left) !important; border:1px solid #000; border-radius:8px;
-}
+
 
 #kalamos-write-workspace-root .tool-pill.toolbar-all-tools { left:0 !important; top:0 !important; }
 

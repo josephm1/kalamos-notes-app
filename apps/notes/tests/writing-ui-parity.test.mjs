@@ -41,11 +41,16 @@ test('compact toolbar exposes Add page and horizontal spacing without exposing e
   } finally {dom.window.close()}
 })
 
-test('a positioned collapsed tab has a complete outline and rounded corners on both sides',()=>{
-  const dom=new JSDOM(`<style>${read('features/writing/workspace/src/kalamos/notes-writing-ui.css')}</style><div id="kalamos-write-workspace-root"><div class="tool-pill toolbar-collapsed toolbar-positioned"></div></div>`)
+test('collapsed and open compact handles share their size, outline and rounded corners',()=>{
+  const dom=new JSDOM(`<style>${read('features/writing/workspace/src/kalamos/notes-writing-ui.css')}</style><div id="kalamos-write-workspace-root"><div class="tool-pill toolbar-collapsed toolbar-positioned"><button class="toolbar-handle"></button></div><div class="tool-pill open"><button class="toolbar-handle"></button></div></div>`)
   try {
     const style=dom.window.getComputedStyle(dom.window.document.querySelector('.tool-pill'))
     assert.equal(style.borderLeftWidth,'1px');assert.equal(style.borderLeftStyle,'solid')
-    assert.equal(style.borderRightWidth,'1px');assert.equal(style.borderRadius,'8px')
+    assert.equal(style.borderRightWidth,'1px');assert.equal(style.borderRadius,'7px')
+    const open=dom.window.getComputedStyle(dom.window.document.querySelector('.tool-pill.open'))
+    for(const property of ['width','minWidth','borderRadius','borderLeftWidth','borderRightWidth'])assert.equal(style[property],open[property],property)
+    const collapsedHandle=dom.window.getComputedStyle(dom.window.document.querySelector('.toolbar-collapsed .toolbar-handle'))
+    const openHandle=dom.window.getComputedStyle(dom.window.document.querySelector('.open .toolbar-handle'))
+    for(const property of ['width','minWidth','height','minHeight','padding'])assert.equal(collapsedHandle[property],openHandle[property],property)
   }finally{dom.window.close()}
 })

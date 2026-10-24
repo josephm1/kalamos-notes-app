@@ -3675,7 +3675,7 @@ export class PenWorkspace {
       // A saved position must remain reachable after rotation or opening the taller pill.
       const left = Math.max(0,Math.min(parseFloat(bar.style.left),root.width-rect.width));
       const top = Math.max(0,Math.min(parseFloat(bar.style.top),root.height-rect.height));
-      bar.style.left = `${left}px`; bar.style.setProperty("--toolbar-left",bar.style.left); bar.style.top = `${top}px`;
+      bar.style.left = `${left}px`; bar.style.top = `${top}px`;
     };
     const reportToolbarLayout = (before: DOMRect) => {
       requestAnimationFrame(() => {
@@ -3928,7 +3928,6 @@ export class PenWorkspace {
     const savedPosition = this.props.prefs.toolbarPosition;
     if (savedPosition && Number.isFinite(savedPosition.left) && Number.isFinite(savedPosition.top)) {
       bar.style.left = `${Math.max(0,savedPosition.left)}px`;
-      bar.style.setProperty("--toolbar-left", bar.style.left);
       bar.style.top = `${Math.max(0,savedPosition.top)}px`;
       bar.classList.add("toolbar-positioned");
     }
@@ -4035,7 +4034,6 @@ export class PenWorkspace {
       const left = Math.min(drag.maxLeft, Math.max(drag.rootLeft, drag.barLeft + dx));
       const top = Math.min(drag.maxTop, Math.max(drag.rootTop, drag.barTop + dy));
       bar.style.left = `${left - drag.rootLeft}px`;
-      bar.style.setProperty("--toolbar-left", bar.style.left);
       bar.style.top = `${top - drag.rootTop}px`;
       bar.classList.add("toolbar-positioned");
       event.preventDefault();
