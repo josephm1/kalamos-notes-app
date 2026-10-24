@@ -467,11 +467,10 @@ document.write('<script src="js/notebook-migration.js"><\/script>');
 
   }
 
-  // The high-water counter survives renames and deletions; existing names also
-  // protect imported libraries from collisions. Opening/cancelling consumes no number.
+  // Derive the next name from current library titles, including imported notebooks.
+  // Deleted and renamed notebooks do not reserve numbers.
   function nextNotebookNumber() {
-    let number = Number(localStorage.getItem('notes.notebookCounter')) || 0
-    if (!Number.isSafeInteger(number) || number < 0) number = 0
+    let number = 0
     ;(libraryData.notebooks || []).forEach(function (nb) {
       const match = /^Notebook (\d+)$/.exec(nb.title || '')
       if (match && Number.isSafeInteger(Number(match[1]))) number = Math.max(number, Number(match[1]))
@@ -582,7 +581,6 @@ document.write('<script src="js/notebook-migration.js"><\/script>');
       try {
         const starter = await editor.createTemplate(selected, desiredTitle)
         createPlanningNotebook(desiredTitle, starter)
-        localStorage.setItem('notes.notebookCounter', String(number))
         usage[selected] = {count: (Number(usage[selected]?.count) || 0)+1, lastUsed: Date.now()}
         localStorage.setItem('notes.templateUsage',JSON.stringify(usage))
         overlay.remove()

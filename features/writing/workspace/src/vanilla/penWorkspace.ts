@@ -1,3 +1,4 @@
+import type { DocumentAction } from "./documentActions";
 import { IMAGE_HANDLES, resizeImage, type ImageHandle } from "../editor/imageResize";
 import { audioCard, updateAudioCard } from "./audioCard";
 import { AttachmentImages, isAttachmentObject, validPageAttachment, drawAttachment, type Attachment, type PageAttachment, type AudioStatus } from "../editor/pageAttachments";
@@ -125,8 +126,7 @@ export type PenWorkspaceProps = {
   loadAttachmentImage?: (attachment: Attachment) => Promise<string>;
   onActivateAttachment?: (object: PageObject) => void;
   onAttachmentError?: (message: string) => void;
-  documentAction?: {label:string;shortLabel?:string;run:()=>void};
-  documentActions?: {label:string;shortLabel?:string;icon?:string;onPress?:()=>boolean;run:()=>void}[];
+  documentActions?: DocumentAction[];
   pageTools?: WorkspacePageTools;
   block: Block;
   existingRuns: InlineInkRun[];
@@ -3669,8 +3669,17 @@ export class PenWorkspace {
       return s;
     };
 
+    const clampToolbarPosition = () => {
+      if (!bar.classList.contains("toolbar-positioned") || bar.classList.contains("toolbar-all-tools")) return;
+      const root = this.root.getBoundingClientRect(), rect = bar.getBoundingClientRect();
+      // A saved position must remain reachable after rotation or opening the taller pill.
+      const left = Math.max(0,Math.min(parseFloat(bar.style.left),root.width-rect.width));
+      const top = Math.max(0,Math.min(parseFloat(bar.style.top),root.height-rect.height));
+      bar.style.left = `${left}px`; bar.style.setProperty("--toolbar-left",bar.style.left); bar.style.top = `${top}px`;
+    };
     const reportToolbarLayout = (before: DOMRect) => {
       requestAnimationFrame(() => {
+        clampToolbarPosition();
         this.syncWritingExclusion();
         const after = bar.getBoundingClientRect();
         if (this.props.onToolbarLayoutChange) {
@@ -3698,13 +3707,20 @@ export class PenWorkspace {
       "Expand tools",
       () => {
         const expanded = bar.classList.toggle("toolbar-all-tools");
+        if (!expanded && this.props.notebookToolbar) {
+          bar.classList.add("toolbar-collapsed");
+          handleBtn.setAttribute("aria-expanded", "false");
+          handleBtn.title = "Hold to move; tap to show toolbar";
+          handleBtn.setAttribute("aria-label", "Show toolbar");
+        }
         arrangeExpandedTools(expanded);
         expandBtn.setAttribute("aria-expanded", String(expanded));
         expandBtn.setAttribute("aria-pressed", String(expanded));
-        expandBtn.title = expanded ? "Use compact toolbar" : "Expand tools";
-        expandBtn.setAttribute("aria-label", expanded ? "Use compact toolbar" : "Expand tools");
-        this.props.onToolbarModeChange?.(expanded ? "full" : "compact");
+        expandBtn.title = expanded ? (this.props.notebookToolbar ? "Collapse tools" : "Use compact toolbar") : "Expand tools";
+        expandBtn.setAttribute("aria-label", expanded ? (this.props.notebookToolbar ? "Collapse tools" : "Use compact toolbar") : "Expand tools");
+        this.props.onToolbarModeChange?.(expanded ? "full" : this.props.notebookToolbar ? "collapsed" : "compact");
         requestAnimationFrame(() => {
+          clampToolbarPosition();
           this.syncWritingExclusion();
           this.props.onLayoutChanged?.();
         });
@@ -3750,7 +3766,12 @@ export class PenWorkspace {
     );
     writeBtn.dataset.tool = "write";
     core.appendChild(writeBtn);
-    const spacingBtn=btn("↔","spaceHorizontal","Spacing tools",()=>this.afterNativeFlush(()=>this.openSpacingSettings(spacingBtn)),"Spacing tools","spacing");
+    const spacingLabel=this.props.notebookToolbar ? "Horizontal spacing" : "Spacing tools";
+    const spacingBtn=btn("↔","spaceHorizontal",spacingLabel,()=>this.afterNativeFlush(()=>{
+      if(this.props.notebookToolbar && !bar.classList.contains("toolbar-all-tools") && this.tool!=="insert") {
+        this.closePenSettings(); this.setTool("insert");
+      } else this.openSpacingSettings(spacingBtn);
+    }),spacingLabel,"spacing");
     spacingBtn.dataset.tool="insert";spacingBtn.dataset.label="Spacing";spacingBtn.classList.add("toolbar-more");rail.append(spacingBtn);
     const eraseBtn = btn("⌫", "eraser", "Eraser", () => this.afterNativeFlush(() => { this.setTool("erase"); this.openEraserSettings(eraseBtn); }), "Eraser", "erase");
     eraseBtn.dataset.tool = "erase";
@@ -3821,9 +3842,14 @@ export class PenWorkspace {
         }
       }
     }
-    for(const [index,action] of [...(this.props.documentAction?[this.props.documentAction]:[]),...(this.props.documentActions??[])].entries()){
-      const documentBtn=btn(action.label,('icon' in action && typeof action.icon==='string')?action.icon:"ai",action.label,()=>{if('onPress' in action && typeof action.onPress==='function' && action.onPress()===false)return;this.afterNativeFlush(action.run)},action.label,index===0?"document-action":`document-action-${index}`);
-      documentBtn.dataset.label=action.shortLabel ?? action.label;documentBtn.classList.add("toolbar-more");rail.append(documentBtn);
+    for (const [index, action] of (this.props.documentActions ?? []).entries()) {
+      const documentBtn = btn(action.label, action.icon ?? "ai", action.label, () => {
+        if (action.options?.length) {
+          this.afterNativeFlush(() => this.openDocumentActionMenu(documentBtn, action));
+        } else this.runDocumentAction(action);
+      }, action.label, index === 0 ? "document-action" : `document-action-${index}`);
+      documentBtn.dataset.label = action.shortLabel ?? action.label;
+      documentBtn.classList.add("toolbar-more"); rail.append(documentBtn);
     }
     const keyboardBtn = btn(
       "ABC",
@@ -3879,6 +3905,8 @@ export class PenWorkspace {
     const arrangeExpandedTools = (expanded: boolean) => {
       if (!this.props.notebookToolbar) return;
       this.closePenSettings(false);
+      spacingBtn.title = expanded ? "Spacing tools" : "Horizontal spacing";
+      spacingBtn.setAttribute("aria-label",spacingBtn.title);
       if (!expanded) {
         core.replaceChildren(...compactCore);
         rail.replaceChildren(...compactRail);
@@ -3897,6 +3925,13 @@ export class PenWorkspace {
     bar.classList.toggle("notebook-toolbar", !!this.props.notebookToolbar);
     bar.append(core, rail);
 
+    const savedPosition = this.props.prefs.toolbarPosition;
+    if (savedPosition && Number.isFinite(savedPosition.left) && Number.isFinite(savedPosition.top)) {
+      bar.style.left = `${Math.max(0,savedPosition.left)}px`;
+      bar.style.setProperty("--toolbar-left", bar.style.left);
+      bar.style.top = `${Math.max(0,savedPosition.top)}px`;
+      bar.classList.add("toolbar-positioned");
+    }
     let suppressToolbarToggle = false;
     const handleBtn = btn(
       "||",
@@ -3904,7 +3939,6 @@ export class PenWorkspace {
       "Show toolbar",
       () => {
         if (suppressToolbarToggle) {
-          suppressToolbarToggle = false;
           return;
         }
         const before = bar.getBoundingClientRect();
@@ -3918,7 +3952,7 @@ export class PenWorkspace {
           expandBtn.setAttribute("aria-label", "Expand tools");
         }
         handleBtn.setAttribute("aria-expanded", String(!collapsed));
-        handleBtn.title = collapsed ? "Show toolbar" : "Drag to move; tap to hide toolbar";
+        handleBtn.title = collapsed ? "Hold to move; tap to show toolbar" : "Drag to move; tap to hide toolbar";
         handleBtn.setAttribute(
           "aria-label",
           collapsed ? "Show toolbar" : "Move or hide toolbar"
@@ -3950,8 +3984,20 @@ export class PenWorkspace {
         }
       | null = null;
 
+    let dragHoldTimer: number | undefined;
+    let dragArmed = false;
+    let handlePen = false;
+    let handleReleasedAt = -Infinity;
     handleBtn.addEventListener("pointerdown", (event) => {
-      if (bar.classList.contains("toolbar-collapsed")) return;
+      if (drag) return;
+      event.preventDefault();
+      suppressToolbarToggle = false;
+      handlePen = event.pointerType === "pen";
+      dragArmed = !bar.classList.contains("toolbar-collapsed");
+      window.clearTimeout(dragHoldTimer);
+      if (!dragArmed) dragHoldTimer = window.setTimeout(() => {
+        dragArmed = true; suppressToolbarToggle = true;
+      }, 400);
       const rect = bar.getBoundingClientRect();
       const rootRect = this.root.getBoundingClientRect();
       drag = {
@@ -3972,6 +4018,10 @@ export class PenWorkspace {
 
     handleBtn.addEventListener("pointermove", (event) => {
       if (!drag || drag.pointerId !== event.pointerId) return;
+      if (!dragArmed) {
+        if (Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>10) window.clearTimeout(dragHoldTimer);
+        return;
+      }
       const dx = event.clientX - drag.startX;
       const dy = event.clientY - drag.startY;
       if (!drag.moved && Math.hypot(dx, dy) < 6) return;
@@ -3985,6 +4035,7 @@ export class PenWorkspace {
       const left = Math.min(drag.maxLeft, Math.max(drag.rootLeft, drag.barLeft + dx));
       const top = Math.min(drag.maxTop, Math.max(drag.rootTop, drag.barTop + dy));
       bar.style.left = `${left - drag.rootLeft}px`;
+      bar.style.setProperty("--toolbar-left", bar.style.left);
       bar.style.top = `${top - drag.rootTop}px`;
       bar.classList.add("toolbar-positioned");
       event.preventDefault();
@@ -3996,15 +4047,21 @@ export class PenWorkspace {
       const moved = drag.moved;
       const startRect = drag.startRect;
       drag = null;
+      window.clearTimeout(dragHoldTimer);
+      if (event.type !== "pointerup") suppressToolbarToggle = true;
       if (handleBtn.hasPointerCapture?.(event.pointerId)) {
         handleBtn.releasePointerCapture(event.pointerId);
       }
-      if (!moved) return;
+      if (!moved) {
+        if (event.type === "pointerup" && handlePen && !suppressToolbarToggle) {
+          handleReleasedAt = performance.now(); handleBtn.click();
+        }
+        return;
+      }
+      this.props.prefs = {...this.props.prefs, toolbarPosition: {left:parseFloat(bar.style.left),top:parseFloat(bar.style.top)}};
+      this.props.onPreferencesChange?.(this.props.prefs);
       this.props.onToolbarDragChange?.(false);
       suppressToolbarToggle = true;
-      window.setTimeout(() => {
-        suppressToolbarToggle = false;
-      }, 0);
       this.syncWritingExclusion();
       // Standard Android keeps the native writing surface attached during toolbar movement. The
       // DOM therefore moves behind that opaque surface and this one bounded old/new capture makes
@@ -4012,9 +4069,15 @@ export class PenWorkspace {
       // handoff also uses the report to reconcile its final captured position after reattach.
       reportToolbarLayout(startRect);
     };
+    // Swallow the delayed compatibility click after an explicit pen release.
+    handleBtn.addEventListener("click", event => {
+      if (event.isTrusted && performance.now()-handleReleasedAt<600) event.stopImmediatePropagation();
+    }, true);
     handleBtn.addEventListener("pointerup", finishToolbarDrag);
     handleBtn.addEventListener("pointercancel", finishToolbarDrag);
+    handleBtn.addEventListener("lostpointercapture", finishToolbarDrag);
 
+    requestAnimationFrame(clampToolbarPosition);
     return bar;
   }
 
@@ -4024,6 +4087,27 @@ export class PenWorkspace {
       return;
     }
     this.openPenSettings(anchor);
+  }
+
+  private runDocumentAction(action: DocumentAction) {
+    if (action.onPress?.() === false) return;
+    this.afterNativeFlush(() => { this.closePenSettings(); action.run?.(); });
+  }
+
+  private openDocumentActionMenu(anchor: HTMLElement, action: DocumentAction) {
+    this.closePenSettings(false);
+    const panel = document.createElement("div");
+    panel.className = "pen-settings-panel rw-tool-menu rw-document-actions";
+    panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", action.label);
+    const heading = document.createElement("strong"); heading.textContent = action.label; panel.append(heading);
+    for (const option of action.options ?? []) {
+      const button = document.createElement("button"); button.type = "button";
+      button.setAttribute("aria-label", option.label);
+      button.innerHTML = window.KalamosToolbarIcons?.svg(option.icon ?? "ai") ?? inkToolIcon("pen");
+      const label = document.createElement("span"); label.textContent = option.label; button.append(label);
+      bindPenButton(button, () => this.runDocumentAction(option)); panel.append(button);
+    }
+    this.mountNotebookMenu(panel, anchor);
   }
 
   private openPageSettings(anchor: HTMLElement) {

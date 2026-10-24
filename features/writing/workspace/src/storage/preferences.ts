@@ -8,6 +8,7 @@ export type Preferences = {
   reduceEinkRefresh: boolean;
   penColor: string;
   penWidth: number;
+  toolbarPosition?: { left: number; top: number };
   penQuickColors?: [string, string];
   brushStyle?: "pen" | "brush" | "marker";
   fingerTapEdits: boolean; // §17 flag: immediate vs select-then-tap

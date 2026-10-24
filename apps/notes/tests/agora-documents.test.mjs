@@ -15,7 +15,7 @@ function harness({returned=false,stale=false,transcription=false,nativeMode=fals
  w.URL.createObjectURL=()=> 'blob:fixture';w.URL.revokeObjectURL=()=>{}
  w.Image=class{set src(value){queueMicrotask(()=>this.onload())}}
  w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},drawImage(){}});w.HTMLCanvasElement.prototype.toDataURL=()=> 'data:image/jpeg;base64,cHJldmlldw=='
- w.Bridge={showToast(){},getNotebookFile(){return '{"active":0}'}}
+ w.Bridge={showToast(){},getNotebookFile(){return '{"active":0,"pages":[{"id":"first"}]}'}}
  w.AppLibrary={};w.KalamosAppHooks={onLibraryReady(){}};w.AppMode={onResumeApp(){},openNotebook(){return true}}
  w.App={showLibrary(){},showEditor(){}};w.libraryData={notebooks:[{notebookId:'note',title:'Tasks'}],folders:[]}
  w.KalamosNotesMigration={ensure(){}}
@@ -307,8 +307,9 @@ test('AI action queues only the current page JPEG without export, cache, cover o
  const h=harness();try{
   h.w.Bridge.getNotebookFile=()=>JSON.stringify({active:0,pages:[{id:'first'}]})
   let closed=0;h.w.KalamosWriteWorkspace.closeAndWait=async()=>{closed++}
-  const ai=h.w.KalamosWritingHost.documentActions.find(action=>action.label==='Format with AI')
-  assert.equal(ai.label,'Format with AI');assert.equal(ai.shortLabel,'Format with AI')
+  const menu=h.w.KalamosWritingHost.documentActions.find(action=>action.label==='Format with AI')
+  assert.equal(menu.shortLabel,'Format with AI')
+  const ai=menu.options[0];assert.equal(ai.label,'Format this page')
   assert.equal(h.w.KalamosWritingHost.notebookToolbar,true);assert.equal(h.w.KalamosWritingHost.documentAction,undefined)
   ai.run('note');await settle();await settle()
   assert.equal(closed,0);assert.equal(h.w.document.querySelector('[role="dialog"]'),null)
@@ -383,7 +384,7 @@ test('saving status lasts through commit and leaves a dismissible success after 
 
 test('AI press immediately shows preparing before native flush and rejects a second press',async()=>{
  const h=harness();try{
-  const ai=h.w.KalamosWritingHost.documentActions[0]
+  const ai=h.w.KalamosWritingHost.documentActions[0].options[0]
   assert.equal(ai.onPress('note'),true)
   assert.match(h.w.document.querySelector('#notes-ai-progress').textContent,/Preparing page for AI/)
   assert.equal(h.calls.some(c=>c.method==='notes.agora.export'),false)
@@ -401,7 +402,7 @@ test('an unconfigured local formatter opens Notes AI settings without preparing 
  const h=harness();try{
   let settings=0;h.w.KalamosNotesAI={openSettings(){settings++}}
   const call=h.w.AB.call.bind(h.w.AB);h.w.AB.call=(method,args)=>method==='notes.ai.settings'?{configured:false}:call(method,args)
-  assert.equal(h.w.KalamosWritingHost.documentActions[0].onPress('note'),false)
+  assert.equal(h.w.KalamosWritingHost.documentActions[0].options[0].onPress('note'),false)
   assert.equal(settings,1);assert.equal(h.calls.some(c=>c.method==='notes.ai.processImage'),false)
  }finally{h.dom.window.close()}
 })
@@ -461,7 +462,7 @@ test('worker errors remain visible with their reason after receipt acknowledgmen
 test('preparation failures produce a persistent error and retry replaces it immediately',async()=>{
  const h=harness();try{
   h.w.KalamosWriteWorkspace.checkpointWorkspace=async()=>{throw new Error('Page could not be saved')}
-  const action=h.w.KalamosWritingHost.documentActions[0];action.run('note');await settle();await settle()
+  const action=h.w.KalamosWritingHost.documentActions[0].options[0];action.run('note');await settle();await settle()
   const status=h.w.document.querySelector('#notes-ai-progress');assert.equal(status.dataset.kind,'error');assert.match(status.textContent,/Page could not be saved/)
   assert.equal(h.calls.some(c=>c.method==='notes.ai.processImage'),false)
   assert.equal(action.onPress('note'),true);assert.equal(status.dataset.kind,'progress');assert.match(status.textContent,/Preparing page/)
@@ -485,7 +486,7 @@ test('failed local placement remains an error rather than reporting successful s
 test('native AI press shows a real toast immediately and only refreshes the existing gutter once per state',async()=>{
  const h=harness({nativeMode:true});try{
   const toasts=[],regions=[];h.w.Bridge.showToast=text=>toasts.push(text);h.w.Bridge.snapshotToolbarRegion=(...bounds)=>regions.push(bounds)
-  const action=h.w.KalamosWritingHost.documentActions[0];assert.equal(action.onPress('note'),true)
+  const action=h.w.KalamosWritingHost.documentActions[0].options[0];assert.equal(action.onPress('note'),true)
   assert.deepEqual(toasts,['Preparing page for AI…']);await settle()
   const status=h.w.document.querySelector('#notes-ai-progress');assert.equal(status.classList.contains('notes-ai-native-summary'),true)
   assert.equal(regions.length,1);assert.equal(regions[0][1],h.w.innerHeight-20)
@@ -529,5 +530,51 @@ test('failed page sharing cancels staged files and never opens a partial share',
   await h.w.KalamosNotesAgora.shareNote('note')
   assert.equal(h.calls.some(c=>c.method==='notes.share.open'),false);assert.equal(h.calls.find(c=>c.method==='notes.share.cancel').args.token,'cancel-me')
   h.w.AppLibrary.readOnly=true;assert.equal(h.w.AppLibrary.contextActions({notebookId:'note'}).some(a=>a.label==='Share'),false)
+ }finally{h.dom.window.close()}
+})
+
+test('AI tap pins the page open at press even if navigation changes during the flush',async()=>{
+ const h=harness();try{
+  let active=0
+  h.w.Bridge.getNotebookFile=()=>JSON.stringify({active,pages:[{id:'first'},{id:'second'}]})
+  const ai=h.w.KalamosWritingHost.documentActions[0].options[0]
+  assert.equal(ai.onPress('note'),true)
+  active=1;ai.run('note');await settle();await settle()
+  assert.equal(h.calls.find(c=>c.method==='notes.ai.processImage').args.pageId,'first')
+ }finally{h.dom.window.close()}
+})
+
+test('notebook menu option processes original pages sequentially with fresh revisions',async()=>{
+ const h=harness();try{
+  h.w.KalamosWriteWorkspace.isOpen=()=>true
+  h.w.Bridge.getNotebookFile=()=>JSON.stringify({active:1,pages:[{id:'first'},{id:'second'},{id:'third'}]})
+  h.w.KalamosWriteWorkspace.materializeNotebookImage=async()=>({blocks:[],sheets:[{source:'',sidecar:{}}]})
+  let current={},revision=0
+  const original=h.w.AB.call.bind(h.w.AB)
+  h.w.AB.call=(method,args)=>{
+   if(method==='notes.ai.processImage'){h.calls.push({method,args});current={requestId:'request-'+args.pageId,pending:true};return current}
+   if(method==='notes.ai.backgroundResult')return current
+   if(method==='notes.ai.backgroundConsumed'){h.calls.push({method,args});current={};return{}}
+   if(method==='notes.agora.inspect'||method==='notes.agora.revisionSnapshot')return{revisionId:'rev-'+revision,inkRegions:[]}
+   if(method==='notes.agora.apply')revision++
+   return original(method,args)
+  }
+  h.w.KalamosWritingHost.onDocumentOpened('note');await settle()
+  const menu=h.w.KalamosWritingHost.documentActions[0]
+  assert.deepEqual(Array.from(menu.options,option=>option.label),['Format this page','Format this whole notebook'])
+  assert.equal(menu.run,undefined);assert.equal(menu.onLongPress,undefined)
+  const convert=menu.options[1];assert.equal(convert.onPress('note'),true);convert.run('note')
+  await settle();await settle();await settle()
+  assert.deepEqual(h.calls.filter(c=>c.method==='notes.ai.processImage').map(c=>c.args.pageId),['first'])
+  for(const pageId of ['first','second','third']) {
+   current={requestId:'request-'+pageId,proposal:{operation:'replace_page',proposalId:'result-'+pageId,baseRevisionId:'rev-'+revision,targetPageIds:[pageId],markdown:'Formatted'}}
+   h.w.KalamosWritingHost.onDocumentOpened('note')
+   await settle();await settle();await settle();await settle()
+  }
+  const requests=h.calls.filter(c=>c.method==='notes.ai.processImage')
+  assert.deepEqual(requests.map(c=>c.args.pageId),['first','second','third'])
+  assert.deepEqual(requests.map(c=>c.args.expectedRevisionId),['rev-0','rev-1','rev-2'])
+  assert.equal(h.calls.filter(c=>c.method==='notes.ai.backgroundConsumed').length,3)
+  assert.equal(h.w.localStorage.getItem('notes.ai.notebookPages.note'),null)
  }finally{h.dom.window.close()}
 })

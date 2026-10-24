@@ -1,3 +1,41 @@
+## 24 October 2026 — Compact controls, movable tab and AI scope
+
+Compact Notes exposes Add page and one-tap horizontal spacing. Expanded tools close directly to
+the collapsed tab. The collapsed tab arms movement after a 400ms hold; the open pill retains its
+six-pixel drag threshold. Both accept pen/touch, keep the existing flush-before-handoff and final
+bounded capture, and suppress the drag's delayed compatibility click. Toolbar position is a shared
+writing preference restored on page changes/reopen and clamped to available geometry. Expanded
+chrome ignores floating offsets. No daemon cadence, capture queue or waveform changes.
+
+Tapping Format with AI opens the same measured small menu used by the pen tools, with exactly
+“Format this page” and “Format this whole notebook”. Selection pins the page before the native flush;
+opening or dismissing the menu makes no provider request. Removed the superseded AI long-press
+plumbing and unused singular documentAction API. One shared typed documentActions contract now
+owns commands and their optional menu choices. The older notebook converter remains because the
+current migration path still needs it to preserve existing notes.
+
+Positioned collapsed tabs have a complete rounded border on both sides, instead of retaining the
+left-edge tab’s open border. Owner confirmed the previous installed update was substantially better;
+this outline correction was identified in a local ADB screenshot. Captures and user notes stay local.
+
+Entire-notebook formatting keeps the original page IDs in an app-owned persistent queue, uses the
+existing image-only native job per page, and checkpoints/validates each new revision before the next
+request. Each successful page saves before continuing; an error stops the remaining queue. A pending
+native job can finish while Notes is closed; reopening the notebook resumes remaining pages. New
+overflow sheets are not added to the original conversion scope. Existing per-page revision validation,
+Undo and idempotent application remain authoritative.
+
+Default notebook numbering uses only current library titles; deleted/renamed notebooks and the old
+local counter no longer reserve numbers. With no numbered titles remaining, creation starts at
+Notebook 1. Imported numbered titles still prevent collisions.
+
+Validation: writing745/typecheck/Android regeneration; Notes web132; Notes native99 (one skipped)
+and shared runtime61 passed. Standard and Bigme debug APKs build. Installed the Bigme build with
+adb install -r, preserving app data, and verified its installed SHA256:
+1254e521d99bc20e1a71ac6e415736d8af23352ec4305274a6484d554832944c. Local ADB screenshots and WebView inspection verify the complete
+floating-tab border and two-option AI menu with outline icons; opening it starts no formatting.
+Physical pen latency, retained panel appearance and gesture acceptance remain owner-run.
+
 ## 21 October 2026 — Delayed erase flash resolved: per-client idle recommit
 
 Owner still saw a whole-panel flash after the local erase completed. The captured reproduction

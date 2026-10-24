@@ -1,3 +1,4 @@
+import type { DocumentAction } from "./documentActions";
 import type { Attachment, PageAttachment, AudioStatus } from "../editor/pageAttachments";
 import type { PageObject } from "../editor/pageObjects";
 // Vanilla shell — mirrors a slice of src/app/App.tsx: open a document, render
@@ -72,8 +73,7 @@ export type CreateAppOptions = {
   onActivateAttachment?: (object: PageObject) => void;
   onAttachmentError?: (message: string) => void;
   notebookToolbar?: boolean;
-  documentAction?: {label:string;shortLabel?:string;run:()=>void};
-  documentActions?: {label:string;shortLabel?:string;onPress?:()=>boolean;run:()=>void}[];
+  documentActions?: DocumentAction[];
   pageTools?: WorkspacePageTools;
   store: DocStore;
   chrome: AppChrome;
@@ -324,7 +324,6 @@ export function createApp(host: HTMLElement, opts: CreateAppOptions): VanillaApp
     workspace = new PenWorkspace(body, {
       pageTools: opts.pageTools,
       notebookToolbar: opts.notebookToolbar,
-      documentAction:opts.documentAction,
       documentActions:opts.documentActions,
       block,
       existingRuns: runs,

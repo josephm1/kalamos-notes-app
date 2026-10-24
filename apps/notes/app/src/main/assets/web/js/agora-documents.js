@@ -4,6 +4,11 @@
   let session = null, pendingRequest = '', busy = false, activeSheet = null, pendingTimer = null, parkedNotebook = null, blockedNotebook = null, shelfPicker = null, showShelf = null
   let backgroundNotebook = null, backgroundTimer = null, backgroundPreparing = false, backgroundQueued = false, backgroundWorkingNotebook = null, backgroundStatusTimer = null
   const backgroundReplays = new Map()
+  const backgroundChecks = new Set()
+  let queuedPage = null
+  const batchKey = id => 'notes.ai.notebookPages.'+id
+  const batchPages = id => { try { return JSON.parse(localStorage.getItem(batchKey(id)) || '[]') } catch (_) { return [] } }
+  const saveBatch = (id,pages) => pages.length ? localStorage.setItem(batchKey(id),JSON.stringify(pages)) : localStorage.removeItem(batchKey(id))
   const editor = () => window.KalamosWriteWorkspace
   const notify = text => Bridge.showToast(text)
   function call(method, args) {
@@ -449,8 +454,16 @@
   function beginBackgroundPreparation(id) {
     if(AB.call('notes.ai.settings',{}).configured===false){void window.KalamosNotesAI.openSettings();return false}
     if(busy || backgroundPreparing || backgroundQueued || backgroundWorkingNotebook===id)return false
+    const index=JSON.parse(Bridge.getNotebookFile(id,'planning.pages.json'))
+    queuedPage={notebookId:id,pageId:index.pages[index.active].id}
     backgroundQueued=true
     backgroundStatus('Preparing page for AI…')
+    return true
+  }
+  function beginNotebookPreparation(id) {
+    if(!beginBackgroundPreparation(id))return false
+    const index=JSON.parse(Bridge.getNotebookFile(id,'planning.pages.json'))
+    saveBatch(id,index.pages.map(page=>page.id))
     return true
   }
   async function formatWithAI(id) {
@@ -464,7 +477,9 @@
       await editor().checkpointWorkspace()
       const doc=await call('notes.agora.revisionSnapshot',{notebookId:id})
       const index=JSON.parse(Bridge.getNotebookFile(id,'planning.pages.json'))
-      const pageId=index.pages[index.active].id
+      const pageId=batchPages(id)[0] || (queuedPage?.notebookId===id ? queuedPage.pageId : index.pages[index.active].id)
+      queuedPage=null
+      if(!index.pages.some(page=>page.id===pageId))throw new Error('The selected page is no longer available.')
       const {image}=await raster(await editor().exportSavedDocumentPage(id,pageId))
       const queued=await call('notes.ai.processImage',{notebookId:id,pageId,image,expectedRevisionId:doc.revisionId})
       if(queued.error){
@@ -472,8 +487,8 @@
         throw new Error(queued.error)
       }
       backgroundWorkingNotebook=id
-      if(backgroundNotebook===id){backgroundStatus('Formatting with AI…');void checkBackgroundResult(id)}
-    } catch(error) { backgroundWorkingNotebook=null;backgroundStatus(error.message || 'Could not start AI formatting. Your note is saved.', 'error') }
+      if(backgroundNotebook===id){backgroundStatus('Formatting with AI…');backgroundTimer=setTimeout(()=>void checkBackgroundResult(id),0)}
+    } catch(error) { saveBatch(id,[]);backgroundWorkingNotebook=null;backgroundStatus(error.message || 'Could not start AI formatting. Your note is saved.', 'error') }
     finally {backgroundPreparing=false}
   }
   async function checkBackgroundResult(id) {
@@ -482,17 +497,25 @@
     // Page management owns the manifest while its dialog is open. Keep a completed
     // AI result pending until it closes instead of replacing files under selection.
     const deferForDialog=()=>{if(!editor().hasOpenDialog?.())return false;backgroundTimer=setTimeout(()=>void checkBackgroundResult(id),1500);return true}
-    if(deferForDialog())return
+    if(deferForDialog() || backgroundChecks.has(id))return
+    backgroundChecks.add(id)
     try {
       const result=await call('notes.ai.backgroundResult',{notebookId:id})
       if(backgroundNotebook!==id||!editor().isOpen())return
       if(deferForDialog())return
       if(result.proposal && !busy){
         backgroundStatus('Saving formatted note…')
-        await processRevision(id,result.proposal,result.requestId)
+        const applied=await processRevision(id,result.proposal,result.requestId)
+        const remaining=batchPages(id)
+        if(applied && remaining[0]===result.proposal.targetPageIds?.[0])saveBatch(id,remaining.slice(1))
+        if(!applied)saveBatch(id,[])
         await call('notes.ai.backgroundConsumed',{requestId:result.requestId})
         backgroundWorkingNotebook=null
+        if(applied && batchPages(id).length && backgroundNotebook===id) {
+          backgroundTimer=setTimeout(()=>void checkBackgroundResult(id),0)
+        }
       } else if(result.error){
+        saveBatch(id,[])
         backgroundWorkingNotebook=null
         backgroundStatus(result.error, 'error')
         await call('notes.ai.backgroundConsumed',{requestId:result.requestId})
@@ -507,10 +530,11 @@
         }
         if(backgroundNotebook!==id||!editor().isOpen())return
         backgroundTimer=setTimeout(()=>void checkBackgroundResult(id),1500)
-      } else if(!backgroundPreparing && !backgroundQueued){backgroundWorkingNotebook=null;if(document.getElementById('notes-ai-progress')?.dataset.kind==='progress')backgroundStatus(null)}
+      } else if(!backgroundPreparing && !backgroundQueued){backgroundWorkingNotebook=null;if(batchPages(id).length){if(beginBackgroundPreparation(id))void formatWithAI(id)}else if(document.getElementById('notes-ai-progress')?.dataset.kind==='progress')backgroundStatus(null)}
     } catch(error) {backgroundWorkingNotebook=null;backgroundStatus(error.message || 'Could not read the AI result.', 'error')}
+    finally {backgroundChecks.delete(id)}
   }
   window.KalamosNotesAgora={shareNote,workWithAgora,attachToChat,back,options:function(){if(session?.notebookId)void workWithAgora({notebookId:session.notebookId})},choose:function(){void choose().catch(error=>notify(error.message))}}
-  window.KalamosWritingHost={notebookToolbar:true,onDocumentOpened:function(id){backgroundNotebook=id;backgroundReplays.clear();void checkBackgroundResult(id)},onDocumentClosed:function(id){if(backgroundNotebook===id){backgroundNotebook=null;if(!busy)backgroundStatus(null);if(backgroundTimer)clearTimeout(backgroundTimer);backgroundTimer=null}AB.call('notes.agora.releaseEditor',{notebookId:id})},documentActions:[{shortLabel:'Format with AI',label:'Format with AI',onPress:beginBackgroundPreparation,run:id=>void formatWithAI(id)},{shortLabel:'Share',label:'Share',icon:'share',run:id=>void shareNote(id)}]}
+  window.KalamosWritingHost={notebookToolbar:true,onDocumentOpened:function(id){backgroundNotebook=id;backgroundReplays.clear();void checkBackgroundResult(id)},onDocumentClosed:function(id){if(backgroundNotebook===id){backgroundNotebook=null;if(!busy)backgroundStatus(null);if(backgroundTimer)clearTimeout(backgroundTimer);backgroundTimer=null}AB.call('notes.agora.releaseEditor',{notebookId:id})},documentActions:[{shortLabel:'Format with AI',label:'Format with AI',options:[{label:'Format this page',icon:'newNote',onPress:beginBackgroundPreparation,run:id=>void formatWithAI(id)},{label:'Format this whole notebook',icon:'grid',onPress:beginNotebookPreparation,run:id=>void formatWithAI(id)}]},{shortLabel:'Share',label:'Share',icon:'share',run:id=>void shareNote(id)}]}
 
 })()

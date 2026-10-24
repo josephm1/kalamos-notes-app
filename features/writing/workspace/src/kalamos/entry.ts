@@ -1,3 +1,4 @@
+import type { DocumentAction } from "../vanilla/documentActions";
 import type { PageAttachment, AudioStatus } from "../editor/pageAttachments";
 import { markdownImportBlocks } from "../editor/markdownImport";
 import { notebookSheetsToMarkdown } from "../editor/notebookMarkdown";
@@ -404,6 +405,14 @@ function openNotebook(notebookId: string) {
   });
 }
 
+function bindDocumentAction(action: DocumentAction<[string]>, notebookId: string): DocumentAction {
+  return {...action,
+    onPress: action.onPress ? () => action.onPress!(notebookId) : undefined,
+    run: action.run ? () => action.run!(notebookId) : undefined,
+    options: action.options?.map(option => bindDocumentAction(option, notebookId)),
+  };
+}
+
 function openWorkspaceNotebook(notebookId: string, toolbarMode: "collapsed" | "compact" | "full" = "collapsed", keepZoom = false, notifyOpened = true) {
   attachmentOwner++;
   if(refreshingNotebook){revisionRefreshToken++;refreshingNotebook=null;root().replaceChildren();}
@@ -430,8 +439,7 @@ function openWorkspaceNotebook(notebookId: string, toolbarMode: "collapsed" | "c
     },
     onActivateAttachment: object => window.KalamosWritingHost?.activateAttachment?.(object),
     onAttachmentError: message => window.KalamosWritingHost?.attachmentError?.(message),
-    documentAction:window.KalamosWritingHost?.documentAction?{label:window.KalamosWritingHost.documentAction.label,shortLabel:window.KalamosWritingHost.documentAction.shortLabel,run:()=>window.KalamosWritingHost?.documentAction?.run(notebookId)}:undefined,
-    documentActions:window.KalamosWritingHost?.documentActions?.map(action=>({...action,onPress:action.onPress?()=>action.onPress!(notebookId):undefined,run:()=>action.run(notebookId)})),
+    documentActions: window.KalamosWritingHost?.documentActions?.map(action => bindDocumentAction(action, notebookId)),
     pageTools: { overview: openPageOverview, index: sheets.active, count: sheets.pages.length, change: action => void changeSheet(action), overflow: height => void paginateCurrentSheet(height) },
     chrome: "kalamos",
     directWorkspace: true,

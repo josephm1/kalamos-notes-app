@@ -428,7 +428,7 @@ test('classic scribble erases page and staged Zoom ink in one reversible transac
   assert.deepEqual(page.strokes,[neighbor]);assert.equal(staged.length,0)
 })
 
-test('default notebook numbers survive rename/delete, imports and cancellation', () => {
+test('default notebook numbers follow current titles after rename/delete and imports', () => {
   const method = overlay.slice(overlay.indexOf('  function nextNotebookNumber()'), overlay.indexOf('  function openCreateDialog()'))
   let counter = null
   const context = { libraryData: {notebooks:[]}, localStorage:{getItem:()=>counter} }
@@ -436,7 +436,7 @@ test('default notebook numbers survive rename/delete, imports and cancellation',
   // Looking at the prompt does not consume a number.
   assert.equal(runInNewContext(method+';nextNotebookNumber()',context),1)
   counter='4'; context.libraryData.notebooks=[{title:'Renamed notebook'}]
-  assert.equal(runInNewContext(method+';nextNotebookNumber()',context),5)
+  assert.equal(runInNewContext(method+';nextNotebookNumber()',context),1)
   context.libraryData.notebooks.push({title:'Notebook 12'})
   assert.equal(runInNewContext(method+';nextNotebookNumber()',context),13)
 })

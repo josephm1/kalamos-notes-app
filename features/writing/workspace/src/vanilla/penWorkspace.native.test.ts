@@ -2483,7 +2483,7 @@ describe('host document handoff',()=>{
  it('keeps a separate AI action in the expanded rail and flushes pen input before invoking it',()=>{
   const host=document.createElement('div');document.body.append(host);
   const queued:Array<()=>void>=[],agora=vi.fn(),ai=vi.fn(),onPress=vi.fn(()=>true);
-  const ws=new PenWorkspace(host,{block:parseMarkdown('Notes')[0],existingRuns:[],prefs:DEFAULT_PREFERENCES,eink:true,native:true,onCommit(){},onCancel(){},documentAction:{label:'Work with Agora',shortLabel:'Agora',run:agora},documentActions:[{label:'Format with AI',shortLabel:'AI',onPress,run:ai}],onBeforeNativeAction:action=>queued.push(action)});
+  const ws=new PenWorkspace(host,{block:parseMarkdown('Notes')[0],existingRuns:[],prefs:DEFAULT_PREFERENCES,eink:true,native:true,onCommit(){},onCancel(){},documentActions:[{label:'Work with Agora',shortLabel:'Agora',run:agora},{label:'Format with AI',shortLabel:'AI',onPress,run:ai}],onBeforeNativeAction:action=>queued.push(action)});
   const buttons=host.querySelectorAll<HTMLButtonElement>('[data-action^="document-action"]');
   expect(buttons).toHaveLength(2);expect(buttons[1].dataset.label).toBe('AI');
   expect(buttons[1].getAttribute('aria-label')).toBe('Format with AI');expect(buttons[1].classList.contains('toolbar-more')).toBe(true);
@@ -2495,7 +2495,7 @@ describe('host document handoff',()=>{
  it('uses the writing toolbar exclusion and waits for the native pen flush before opening host UI',()=>{
   const host=document.createElement('div');document.body.append(host);
   const queued:Array<()=>void>=[],run=vi.fn();
-  const ws=new PenWorkspace(host,{block:parseMarkdown('Notes')[0],existingRuns:[],prefs:DEFAULT_PREFERENCES,eink:true,native:true,onCommit(){},onCancel(){},documentAction:{label:'Return to Agora',run},onBeforeNativeAction:action=>queued.push(action)});
+  const ws=new PenWorkspace(host,{block:parseMarkdown('Notes')[0],existingRuns:[],prefs:DEFAULT_PREFERENCES,eink:true,native:true,onCommit(){},onCancel(){},documentActions:[{label:'Return to Agora',run}],onBeforeNativeAction:action=>queued.push(action)});
   const button=host.querySelector<HTMLButtonElement>('[data-action="document-action"]')!;
   expect(button.closest('.tool-pill')).not.toBeNull();expect(button.getAttribute('aria-label')).toBe('Return to Agora');
   button.click();expect(run).not.toHaveBeenCalled();expect(queued).toHaveLength(1);queued[0]();expect(run).toHaveBeenCalledOnce();ws.destroy();host.remove();
@@ -2529,6 +2529,8 @@ it('notebook expansion relocates the same live controls and restores compact ord
   expand.click();
   expect([...core.children]).toEqual(originalCore);
   expect([...rail.children]).toEqual(originalRail);
+  expect(host.querySelector('.tool-pill')!.classList.contains('toolbar-collapsed')).toBe(true);
+  host.querySelector<HTMLButtonElement>('[data-action="toolbar-toggle"]')!.click();
   expand.click(); expand.click();
   expect(host.querySelectorAll('[data-action="write"]')).toHaveLength(1);
   expect([...core.children]).toEqual(originalCore);
@@ -2631,4 +2633,69 @@ it('passive native draft save persists completed ink without a flush, rerender o
  ws.applyNativeWriteStroke([{x:20,y:20,t:1,pressure:.5},{x:40,y:35,t:2,pressure:.6}],false);
  layout.mockClear();await ws.saveDeliveredNativeDraft();expect(saved).toHaveBeenCalledOnce();
  expect(saved.mock.calls[0][0].newRuns.length).toBeGreaterThan(0);expect(saved.mock.calls[0][1]).toBe('checkpoint');expect(flush).not.toHaveBeenCalled();expect(layout).not.toHaveBeenCalled();ws.destroy();
+});
+
+it.each(['pen','touch'])('collapsed toolbar requires a 400ms %s hold and restores its saved position in a new workspace',kind=>{
+  vi.useFakeTimers();
+  const host=document.createElement('div');document.body.append(host);
+  const prefs=vi.fn(),handoff=vi.fn();
+  const options={block:parseMarkdown('Notebook')[0],existingRuns:[],prefs:DEFAULT_PREFERENCES,eink:true,native:true,notebookToolbar:true,onCommit(){},onCancel(){}};
+  const ws=new PenWorkspace(host,{...options,onPreferencesChange:prefs,onToolbarDragChange:handoff});
+  const bar=host.querySelector<HTMLElement>('.tool-pill')!,handle=bar.querySelector<HTMLButtonElement>('[data-action="toolbar-toggle"]')!;
+  vi.spyOn(host,'getBoundingClientRect').mockReturnValue(new DOMRect(0,0,600,800));
+  vi.spyOn(bar,'getBoundingClientRect').mockReturnValue(new DOMRect(0,100,38,50));
+  const send=(type:string,x:number,y:number)=>{
+    const event=new MouseEvent(type,{clientX:x,clientY:y,bubbles:true,cancelable:true});
+    Object.defineProperties(event,{pointerType:{value:kind},pointerId:{value:7}});handle.dispatchEvent(event);
+  };
+  try {
+    send('pointerdown',10,110);vi.advanceTimersByTime(399);send('pointermove',12,110);
+    expect(handoff).not.toHaveBeenCalled();vi.advanceTimersByTime(1);
+    send('pointermove',110,210);send('pointerup',110,210);handle.click();
+    expect(handoff.mock.calls.map(call=>call[0])).toEqual([true,false]);
+    expect(bar.classList.contains('toolbar-collapsed')).toBe(true);
+    expect(prefs.mock.lastCall![0].toolbarPosition).toEqual({left:100,top:200});
+    vi.advanceTimersByTime(1000);handle.click();expect(bar.classList.contains('toolbar-collapsed')).toBe(true);
+    ws.destroy();host.remove();
+    const next=document.createElement('div');document.body.append(next);
+    const reopened=new PenWorkspace(next,{...options,prefs:prefs.mock.lastCall![0]});
+    expect(next.querySelector<HTMLElement>('.tool-pill')!.style.left).toBe('100px');
+    expect(next.querySelector<HTMLElement>('.tool-pill')!.style.top).toBe('200px');
+    reopened.destroy();next.remove();
+  } finally {ws.destroy();host.remove();vi.useRealTimers();}
+});
+
+it('compact horizontal spacing activates after the native flush without a second menu selection',()=>{
+  const host=document.createElement('div');document.body.append(host);
+  const queue:(()=>void)[]=[],tool=vi.fn();
+  const ws=new PenWorkspace(host,{block:parseMarkdown('Note')[0],existingRuns:[],prefs:DEFAULT_PREFERENCES,
+    eink:true,native:true,notebookToolbar:true,onCommit(){},onCancel(){},onToolChange:tool,onBeforeNativeAction:action=>queue.push(action)});
+  host.querySelector<HTMLButtonElement>('[data-action="toolbar-toggle"]')!.click();
+  host.querySelector<HTMLButtonElement>('[data-action="spacing"]')!.click();
+  expect(tool).not.toHaveBeenCalled();queue.shift()!();
+  expect(tool).toHaveBeenLastCalledWith('insert',false);
+  expect(host.querySelector('.rw-spacing-settings')).toBeNull();
+  ws.destroy();host.remove();
+});
+
+it('AI tap opens the shared small menu and only the selected option starts formatting after a flush',()=>{
+  const host=document.createElement('div');document.body.append(host);
+  const queue:(()=>void)[]=[],page=vi.fn(),notebook=vi.fn(),press=vi.fn(()=>true);
+  const ws=new PenWorkspace(host,{block:parseMarkdown('Note')[0],existingRuns:[],prefs:DEFAULT_PREFERENCES,
+    eink:true,native:true,notebookToolbar:true,onCommit(){},onCancel(){},onBeforeNativeAction:action=>queue.push(action),
+    documentActions:[{label:'Format with AI',options:[{label:'Format this page',onPress:press,run:page},{label:'Format this whole notebook',run:notebook}]}]});
+  try {
+    host.querySelector<HTMLButtonElement>('[data-action="document-action"]')!.click();
+    expect(page).not.toHaveBeenCalled();expect(notebook).not.toHaveBeenCalled();
+    expect(host.querySelector('.rw-document-actions')).toBeNull();queue.shift()!();
+    const menu=host.querySelector<HTMLElement>('.rw-document-actions')!;
+    expect(menu.classList.contains('rw-tool-menu')).toBe(true);
+    expect([...menu.querySelectorAll('button')].map(b=>b.textContent)).toEqual(['Format this page','Format this whole notebook']);
+    menu.querySelector<HTMLButtonElement>('[aria-label="Format this page"]')!.click();
+    expect(press).toHaveBeenCalledOnce();expect(page).not.toHaveBeenCalled();queue.shift()!();
+    expect(page).toHaveBeenCalledOnce();expect(menu.isConnected).toBe(false);expect(notebook).not.toHaveBeenCalled();
+    host.querySelector<HTMLButtonElement>('[data-action="document-action"]')!.click();queue.shift()!();
+    host.querySelector<HTMLButtonElement>('[aria-label="Format this whole notebook"]')!.click();queue.shift()!();
+    expect(notebook).toHaveBeenCalledOnce();
+  } finally {ws.destroy();host.remove();}
 });
