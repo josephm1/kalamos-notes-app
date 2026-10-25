@@ -3053,7 +3053,7 @@ export class PenWorkspace {
   private startLasso() {
     this.directSelection=false; this.selectionInteraction=false;
     this.selectedInsertId=null; this.selectedTextWord=null; this.selectedTextWords.clear();
-    this.closePenSettings(); this.setTool("select");
+    this.closePenSettings(); this.setTool("select",true);
   }
 
   /** Snapshot exact selected text ranges and vectors before Cut can change the source page. */
@@ -3324,7 +3324,9 @@ export class PenWorkspace {
     this.afterNativeFlush(() => this.setTool(tool));
   }
 
-  private setTool(tool: Tool) {
+  private setTool(tool: Tool, toolbarOnly = false) {
+    const beforePaper=this.containerEl.getBoundingClientRect();
+    const beforeToolbar=this.toolbarEl.getBoundingClientRect();
     if (tool !== "select") this.directSelection = false;
     this.settleSpacingGesture(true);
     this.hideEraserTip();
@@ -3349,10 +3351,17 @@ export class PenWorkspace {
     this.nativeInkActive = !!this.props.native && (tool === "write" || this.usesNativeSelectionPen);
     if (tool !== "select") this.selectedInsertId = null;
     this.containerEl.className = `reflow-surface tool-${this.tool}`;
-    this.updateToolbarState();
+    // The tool switch reports its final geometry once, after updating the toolbar.
+    this.updateToolbarState(false);
     this.renderOverlay();
     this.props.onToolChange?.(this.tool, this.keyboard);
-    this.props.onLayoutChanged?.();
+    const afterPaper=this.containerEl.getBoundingClientRect();
+    if(toolbarOnly && !this.toolbarEl.classList.contains('toolbar-all-tools') && this.props.onToolbarLayoutChange &&
+      ['left','top','width','height'].every(key=>beforePaper[key as keyof DOMRect]===afterPaper[key as keyof DOMRect])) {
+      const after=this.toolbarEl.getBoundingClientRect();
+      this.props.onToolbarLayoutChange({l:beforeToolbar.left,t:beforeToolbar.top,r:beforeToolbar.right,b:beforeToolbar.bottom},
+        {l:after.left,t:after.top,r:after.right,b:after.bottom});
+    } else this.props.onLayoutChanged?.();
   }
 
   private textBoxWords(id: string) {
@@ -3927,7 +3936,7 @@ export class PenWorkspace {
       documentBtn.dataset.label = action.shortLabel ?? action.label;
       documentBtn.classList.add("toolbar-more"); rail.append(documentBtn);
     }
-    const pasteBtn=btn("Paste","paste","Paste selection",()=>this.afterNativeFlush(()=>this.pasteSelection()),"Paste selection","paste");
+    const pasteBtn=btn("Paste","paste","Paste",()=>this.afterNativeFlush(()=>this.pasteSelection()),"Paste","paste");
     pasteBtn.innerHTML=inkToolIcon('paste');pasteBtn.classList.add('toolbar-more');pasteBtn.dataset.label='Paste';rail.append(pasteBtn);
     const keyboardBtn = btn(
       "ABC",
@@ -4487,15 +4496,15 @@ export class PenWorkspace {
     };
     action("Select again","lasso",()=>this.startLasso());
     const hasSelection=!!this.selectedInsertId||this.selectedTextWords.size>0;
-    action("Copy selection","copy",()=>this.copySelectedBlocks(),!hasSelection);
-    action("Cut selection","cut",()=>this.copySelectedBlocks(true),!hasSelection);
-    action("Paste selection","paste",()=>this.pasteSelection(),!hasSelectionClipboard());
-    action("Duplicate selection","copy",()=>this.duplicateSelectedInk(),!hasSelection);
-    action("Delete selection","delete",()=>this.deleteSelectedBlocks(),!hasSelection);
+    action("Copy","copy",()=>this.copySelectedBlocks(),!hasSelection);
+    action("Cut","cut",()=>this.copySelectedBlocks(true),!hasSelection);
+    action("Paste","paste",()=>this.pasteSelection(),!hasSelectionClipboard());
+    action("Duplicate","copy",()=>this.duplicateSelectedInk(),!hasSelection);
+    action("Delete","delete",()=>this.deleteSelectedBlocks(),!hasSelection);
     if(this.props.onShareSelection && this.selectedTextWords.size)action("Share text","share",()=>{
       const markdown=this.selectedMarkdown();if(markdown)this.props.onShareSelection?.(markdown);
     });
-    if (this.props.hwr?.available()) action("Convert selection to text","text",()=>this.convertSelectedToText(),!this.selectedInsertId);
+    if (this.props.hwr?.available()) action("Convert to text","text",()=>this.convertSelectedToText(),!this.selectedInsertId);
     const selectedBoxId=this.selectedTextWord?.boxId??(this.selectedTextWords.size===1?[...this.selectedTextWords.keys()][0]:undefined);
     if(selectedBoxId)action("Edit text","text",()=>this.editTextBox(selectedBoxId));
     this.root.append(panel);this.penSettingsEl=panel;
@@ -4781,6 +4790,7 @@ export class PenWorkspace {
     panel.remove();
     this.penSettingsEl = null;
     this.penSettingsExclusionRect = null;
+    this.containerEl.querySelectorAll('.rw-selection-options').forEach(button=>button.setAttribute('aria-expanded','false'));
     if (refresh) {
       this.syncWritingExclusion();
       this.reportChromeRegion(oldRect);
@@ -4839,18 +4849,14 @@ export class PenWorkspace {
     );
   }
 
-  private updateToolbarState() {
+  private updateToolbarState(notifyLayout = true) {
     const hasSelection=this.tool==='select' && (!!this.selectedInsertId || this.selectedTextWords.size>0);
     if(hasSelection && !this.selectionInteraction) {
       this.selectionInteraction=true;
       this.nativeInkActive=false;
       // Prepare the solid vector frame before the native host detaches its dashed capture surface.
       this.renderOverlay();
-      if(this.props.notebookToolbar)requestAnimationFrame(()=>{
-        if(!this.root.isConnected || this.tool!=='select' || !this.getSelectedBlockBounds())return;
-        const anchor=this.toolbarEl.querySelector<HTMLElement>('[data-action="select"]');
-        if(anchor)this.openLassoSettings(anchor);
-      });
+
     }
     this.toolbarEl.querySelector<HTMLButtonElement>('[data-action="paste"]')?.toggleAttribute('disabled',!hasSelectionClipboard());
     this.toolbarEl.classList.toggle("selection-active",hasSelection);
@@ -4872,7 +4878,7 @@ export class PenWorkspace {
         const glyph=this.selectionInteraction?"move":"lasso";
         if(b.dataset.selectionGlyph!==glyph){b.innerHTML=inkToolIcon(glyph);b.dataset.selectionGlyph=glyph;}
         b.classList.add("toolbar-icon-button");
-        b.title=this.selectionInteraction?"Move selected words; tap for selection actions":"Draw a lasso to select words";
+        b.title=this.selectionInteraction?"Drag selected content; use More actions for commands":"Draw a lasso to select words";
         b.dataset.label=this.selectionInteraction ? "Move" : "Lasso";
       }
       if (tool === "write") {
@@ -4907,7 +4913,7 @@ export class PenWorkspace {
       // the button used to render it as a blank dashed square on monochrome Android.
       this.convertBtn.disabled = false;
     }
-    this.props.onLayoutChanged?.(); // toolbar state is part of the baked chrome
+    if (notifyLayout) this.props.onLayoutChanged?.(); // toolbar state is part of the baked chrome
   }
 
   // ---- HWR: convert a selected ink run to text (on demand only) ----
@@ -5282,7 +5288,16 @@ export class PenWorkspace {
       if(bounds) {
         const box=document.createElement('div');box.className='rw-selection-box';box.setAttribute('aria-label','Selected words');
         box.style.cssText=`left:${bounds.x}px;top:${bounds.y}px;width:${bounds.width}px;height:${bounds.height}px`;
-        frag.append(box);
+        const more=document.createElement('button');more.type='button';more.className='rw-selection-options';
+        more.setAttribute('aria-label','More actions');more.title='More actions';more.setAttribute('aria-haspopup','dialog');more.setAttribute('aria-expanded','false');
+        more.innerHTML=inkToolIcon('more');
+        more.style.left=`${Math.max(0,Math.min(this.width-44,bounds.x+bounds.width-44))-bounds.x}px`;
+        more.style.top=`${bounds.y-this.containerEl.scrollTop>=50?-50:bounds.height+6}px`;
+        bindPenButton(more,()=>{
+          if(this.penSettingsEl?.classList.contains('rw-lasso-settings'))this.closePenSettings();
+          else this.afterNativeFlush(()=>{this.openLassoSettings(more);more.setAttribute('aria-expanded','true');});
+        });
+        box.append(more);frag.append(box);
       }
     }
     c.insertBefore(frag, this.canvasEl);

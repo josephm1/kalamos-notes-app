@@ -2700,18 +2700,35 @@ it('AI tap opens the shared small menu and only the selected option starts forma
   } finally {ws.destroy();host.remove();}
 });
 
-it('completed lasso reveals contextual actions and restarting capture restores the native selection pen',async()=>{
- const host=document.createElement('div');document.body.append(host);const share=vi.fn(),tool=vi.fn();
+it('lasso leaves movement unobstructed and reveals concise commands only through More actions',async()=>{
+ const host=document.createElement('div');document.body.append(host);const share=vi.fn(),tool=vi.fn(),layout=vi.fn(),chrome=vi.fn();const flushes:(()=>void)[]=[];
  const ws=new PenWorkspace(host,{block:parseMarkdown('\u200b')[0],existingRuns:[],
   existingTextBoxes:[{id:'share-box',blockId:'b0',text:'send this',x:30,y:88,width:200,size:19}],prefs:DEFAULT_PREFERENCES,
-  eink:true,native:true,notebookToolbar:true,onCommit(){},onCancel(){},onShareSelection:share,onToolChange:tool});
+  eink:true,native:true,notebookToolbar:true,onCommit(){},onCancel(){},onShareSelection:share,onToolChange:tool,onLayoutChanged:layout,onToolbarLayoutChange:chrome,onBeforeNativeAction:action=>flushes.push(action)});
  try{
+  layout.mockClear();chrome.mockClear();
   host.querySelector<HTMLButtonElement>('[data-action="select"]')!.click();
+  expect(flushes).toHaveLength(1);expect(ws.currentTool).toBe('write');flushes.shift()!();
+  expect(layout).not.toHaveBeenCalled();expect(chrome).toHaveBeenCalledOnce();
   expect(ws.usesNativeSelectionPen).toBe(true);expect(host.querySelector('.rw-lasso-settings')).toBeNull();
   ws.applyNativeStroke([{x:20,y:78},{x:240,y:78},{x:240,y:125},{x:20,y:125},{x:20,y:78}].map((point,t)=>({...point,t,pressure:.5})));
-  await vi.waitFor(()=>expect(host.querySelector('.rw-lasso-settings')).not.toBeNull());
+  await new Promise(resolve=>requestAnimationFrame(resolve));
+  expect(host.querySelector('.rw-lasso-settings')).toBeNull();
+  vi.spyOn(ws.containerElement,'getBoundingClientRect').mockReturnValue(new DOMRect(0,0,320,700));
+  const before=ws.getSelectedBlockBounds()!;
+  ws.containerElement.dispatchEvent(pointerEvent('pointerdown',7,before.x+5,before.y+5));
+  ws.containerElement.dispatchEvent(pointerEvent('pointermove',7,before.x+29,before.y+49));
+  expect(host.querySelector<HTMLElement>('.rw-selection-box')!.style.transform).toBe('translate(24px,44px)');
+  ws.containerElement.dispatchEvent(pointerEvent('pointerup',7,before.x+29,before.y+49));
+  expect(ws.getSelectedBlockBounds()!.x).toBe(before.x+24);expect(ws.getSelectedBlockBounds()!.y).toBe(before.y+44);
+  expect(host.querySelector('.rw-lasso-settings')).toBeNull();
+  const more=host.querySelector<HTMLButtonElement>('[aria-label="More actions"]')!;
+  expect(more.closest('.rw-selection-box')).not.toBeNull();more.click();
+  expect(host.querySelector('.rw-lasso-settings')).not.toBeNull();expect(more.getAttribute('aria-expanded')).toBe('true');
+  more.click();expect(host.querySelector('.rw-lasso-settings')).toBeNull();expect(more.getAttribute('aria-expanded')).toBe('false');
+  more.click();
   expect(ws.usesNativeSelectionPen).toBe(false);
-  for(const label of ['Copy selection','Cut selection','Delete selection','Share text'])expect(host.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
+  for(const label of ['Copy','Cut','Paste','Duplicate','Delete','Select again','Share text'])expect(host.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
   const button=host.querySelector<HTMLButtonElement>('[aria-label="Share text"]')!;
   button.dispatchEvent(pointerEvent('pointerdown',9,10,10));button.dispatchEvent(pointerEvent('pointerup',9,10,10));button.click();
   expect(share).toHaveBeenCalledTimes(1);expect(share.mock.lastCall![0]).toBe('send this');

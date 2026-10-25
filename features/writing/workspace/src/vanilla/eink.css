@@ -1786,3 +1786,11 @@ body.magnify-active .vanilla-app.direct-workspace .v-modal {
 .rw-image-handle[data-handle=s] { left: 50%; top: 100%; cursor: ns-resize; }
 .rw-image-handle[data-handle=sw] { left: 0; top: 100%; cursor: nesw-resize; }
 .rw-image-handle[data-handle=w] { left: 0; top: 50%; cursor: ew-resize; }
+
+/* Selection stays ready to drag; one explicit More control reveals commands on demand. */
+.rw-selection-options {
+  position:absolute; display:grid; place-items:center; width:44px; height:44px; min-width:44px;
+  padding:8px; margin:0; border:1px solid #000; border-radius:6px; background:#fff; color:#000;
+  pointer-events:auto; touch-action:none; cursor:pointer; z-index:4;
+}
+.rw-selection-options svg { width:26px; height:26px; }

@@ -1186,3 +1186,16 @@ and normalize incremental callbacks into a completed reader stroke. Standard Sur
 waits for surfaceCreated/changed validity. Native preparation copies one provider AAR and generic
 launcher dependencies exclude hidden-API bypass. No cross-provider physical equivalence is claimed;
 owner testing remains required for coordinate alignment, gesture ownership and actual pen latency.
+
+
+## 2026-10-25 Compact Write to Lasso scheduling
+
+An unchanged-paper compact Lasso switch reports the toolbar region once after updating controls,
+avoiding the redundant general layout refresh. Native selection pen transport retains the attached
+controller and ink policy. The serialized regional transaction reuses the existing 32ms expedited
+schedule, preserving flush-before-action, dirty union, full retained bitmap capture and the 180ms
+input guard. Geometry changes and expanded toolbars retain the normal layout path. No vendor
+cadence, lifecycle, readiness or waveform rule changed. Actual pen/panel latency is owner-tested.
+
+Completed selections hand off to WebView movement as before. Do not open the actions dialog on
+selection completion: the explicit More button owns that dialog, leaving the first drag unobstructed.

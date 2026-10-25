@@ -1,3 +1,28 @@
+## 25 October 2026 — Move-first lasso and faster compact tool switching
+
+Successful lasso selection now leaves the content immediately draggable. A 44px More actions
+(…) button follows its bounds; only tapping it opens the existing small tool menu. Tapping again
+closes it. Commands use Copy, Cut, Paste, Duplicate, Delete and Select again; Share text remains
+available for typed/Markdown content. The selection menu no longer opens automatically.
+Interaction references: OneNote's separate movement/actions interaction and Zoom Whiteboard's
+More control:
+https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-learning/lasso-select-ink-strokes-in-onenote-for-ipad-or-iphone
+https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0058334
+
+Write → Lasso keeps the attached native session and changes its pen type to selection. A compact
+switch with unchanged paper geometry now reports one toolbar region instead of duplicate full-page
+layout notifications. Its existing serialized regional capture uses the existing 32ms expedited
+scheduler rather than the 160ms general scheduler. Flush-before-action, dirty-region union, full
+retained-content capture and the 180ms input guard remain. Expanded/changed geometry keeps the
+normal layout path. These scheduler values are not measured end-to-end physical latency.
+No vendor daemon, waveform or ink-mode policy changed. Owner performs physical-device acceptance.
+
+Validation: typecheck, all 752 writing tests and 133 Notes web tests pass; Android assets regenerated.
+Standard and Bigme debug APKs build. Bigme installed with adb install -r, preserving app data.
+Packaged JS/CSS match the generated assets. APK SHA256:
+c6b49c25d2ff7e6ec8e29b24cf50a1013588c6f8ef76349360dc46a16549125a.
+No automated physical pen/panel testing was performed; the owner is testing the installed update.
+
 ## 25 October 2026 — Selection actions, cross-page clipboard and spacing overflow
 
 Lasso now enters capture directly, without opening a settings pop-out over the first stroke.

@@ -1335,3 +1335,29 @@ it('idle native save persists only the delivered model without invoking flush or
  for(const fn of Object.values(calls))expect(fn).not.toHaveBeenCalled();
  Object.assign(native,{ws:null});native.onNativeSaveRequested();expect(saveDeliveredNativeDraft).toHaveBeenCalledOnce();
 });
+
+it('Write to Lasso keeps the native session and presents only the toolbar on the expedited path',()=>{
+ vi.useFakeTimers();
+ const bridge={setInkEnabled:vi.fn(),flushInk:vi.fn(),setPenType:vi.fn(),setInkStyle:vi.fn(),
+  renderInk:vi.fn(),snapshotContent:vi.fn(),snapshotContentPartial:vi.fn(),snapshotMenu:vi.fn(),
+  setWritingBounds:vi.fn(),setWritingExclusion:vi.fn(),setInteractivePanel:vi.fn(),attachInkBox:vi.fn(),detachInkBoxForWeb:vi.fn()};
+ Object.defineProperty(globalThis,'Bridge',{configurable:true,value:bridge});
+ const surface=document.createElement('div'),chrome={l:8,t:100,r:56,b:582};
+ const ws={currentTool:'write',usesNativeSelectionPen:false,isKeyboard:false,magnifyOpen:false,containerElement:surface,
+  nativeChromeRect:()=>chrome,getInkStyle:()=>({width:2,color:'#000000'}),getNativeInkStrokes:()=>[],reconcileNativeCommand:vi.fn()};
+ const native=new Write2Native();Object.assign(native,{ws,attached:true,dpr:1,boxL:0,boxT:0,boxR:600,boxB:800,boxW:600,boxH:800});
+ try{
+  native.hooks().beforeWorkspaceAction!(()=>{
+   ws.currentTool='select';ws.usesNativeSelectionPen=true;
+   native.hooks().onWorkspaceTool!('select',false);
+   native.hooks().onWorkspaceToolbarLayout!(chrome,chrome);
+  });
+  expect(bridge.flushInk).toHaveBeenCalledOnce();expect(bridge.setPenType).not.toHaveBeenCalled();
+  native.onNativeFlushed();expect(bridge.setPenType).toHaveBeenLastCalledWith('selection');
+  vi.advanceTimersByTime(31);expect(bridge.snapshotContentPartial).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(1);expect(bridge.snapshotContentPartial).toHaveBeenCalledWith(0,0,600,800,8,100,56,582);
+  expect(bridge.snapshotContent).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(180);expect(bridge.setInkEnabled).toHaveBeenLastCalledWith(true);
+  expect(bridge.attachInkBox).not.toHaveBeenCalled();expect(bridge.detachInkBoxForWeb).not.toHaveBeenCalled();expect(bridge.setInteractivePanel).not.toHaveBeenCalled();
+ }finally{delete (globalThis as any).Bridge;vi.useRealTimers();}
+});

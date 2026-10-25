@@ -775,7 +775,9 @@ export class Write2Native {
     // foreground bitmap exposes that baked copy when the pill grows, shrinks or moves.
     // Re-bake the complete content, presenting only the old/new footprint union.
     this.captureFloatingChrome(refresh);
-    this.syncNative(refresh);
+    // A same-geometry ink-tool switch needs only the toolbar's changed state. Reuse the
+    // expedited regional transaction, keeping its flush barrier and 180ms input gate.
+    this.syncNative(refresh,this.usesSelectionPen());
     this.updateWriteProtection();
   }
 
@@ -869,7 +871,7 @@ export class Write2Native {
   // then snapshotContent bakes the DOM and refreshes the
   // dirty region once with everything already in sync — this is what removes
   // the pen-off blank flash of two stacked full-screen GU16 refreshes.
-  syncNative(rect?: CssRect, completedErase = false, cleanErase = false) {
+  syncNative(rect?: CssRect, expedited = false, cleanErase = false) {
     if (!this.attached || this.targeting) return;
     // Keep erase bounds separate: a simultaneous full layout update must not turn
     // regional ghost cleanup into a whole-panel flash. Never clean on live pen input.
@@ -882,7 +884,7 @@ export class Write2Native {
     // Device logs showed 256–307 ms of avoidable postponement when these
     // notifications restarted the timer. Keep earliest-deadline coalescing;
     // reverting to trailing debounce restores the half-second page-turn lag.
-    const delay = this.ws?.magnifyOpen ? 60 : this.pageTurnChrome ? 0 : completedErase ? 32 : 160;
+    const delay = this.ws?.magnifyOpen ? 60 : this.pageTurnChrome ? 0 : expedited ? 32 : 160;
     const deadline = performance.now() + delay;
     if (this.syncDeadline !== undefined && this.syncDeadline <= deadline) return;
     window.clearTimeout(this.syncTimer);
