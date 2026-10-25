@@ -1,3 +1,7 @@
+## 25 October 2026 — Notes ChatGPT plan support
+
+Notes-owned native account connection, explicit plan/API billing selection, encrypted OAuth vault and completed-only Responses formatting are described in [apps/notes/HANDOVER.md](apps/notes/HANDOVER.md). No feature, vendor or writing implementation was changed. Device acceptance and live account sign-in remain with the owner.
+
 ## 25 October 2026 — Move-first lasso and faster compact tool switching
 
 Successful lasso selection now leaves the content immediately draggable. A 44px More actions

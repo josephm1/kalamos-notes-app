@@ -14,6 +14,8 @@
 
     <queries><package android:name="com.newoether.agora.einkpreview" /><package android:name="com.newoether.agora" /></queries>
 
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <application
         android:name=".KalamosApp"
         android:allowBackup="true"
@@ -25,6 +27,10 @@
         android:theme="@style/Theme.Kalamos"
         android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
 
+        <service android:name=".auth.SignInService" android:exported="false" android:foregroundServiceType="dataSync" />
+        <activity android:name=".auth.ChatGptActivity" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            <intent-filter><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="${applicationId}.chatgpt" android:host="signin-complete" /></intent-filter>
+        </activity>
         <meta-data android:name="kalamos.inkTrace" android:value="${inkTrace}" />
 
         <activity

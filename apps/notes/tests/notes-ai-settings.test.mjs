@@ -4,11 +4,11 @@ import {createRequire} from 'node:module'
 import {readFileSync} from 'node:fs'
 const {JSDOM}=createRequire(new URL('../../../features/writing/workspace/package.json',import.meta.url))('jsdom')
 const source=readFileSync(new URL('../app/src/main/assets/web/js/notes-ai-settings.js',import.meta.url),'utf8')
-function fixture({saved=true,delayed=false}={}){
+function fixture({saved=true,delayed=false,plan=false}={}){
  const dom=new JSDOM('<body><button id="origin">AI settings</button></body>',{url:'https://fixture.invalid',runScripts:'outside-only'}),w=dom.window,calls=[],dialogs=[]
  w.KalamosWriteWorkspace={isOpen:()=>true,async setDocumentDialog(active){dialogs.push(active)}}
  const handlers={}
- w.AB={on(id,fn){handlers[id]=fn},off(id){delete handlers[id]},call(method,args){calls.push({method,args});if(method==='notes.ai.settings')return{baseUrl:'https://example.invalid/v1',model:saved?'vision-model':'',hasKey:saved};if(method==='notes.ai.models')return delayed?{reqId:'models-'+calls.length}:{models:[{id:'vision-model',name:'Vision',vision:true},{id:'other',name:'Other'}]};return{configured:true}}}
+ w.AB={on(id,fn){handlers[id]=fn},off(id){delete handlers[id]},call(method,args){calls.push({method,args});if(method==='notes.ai.settings')return{baseUrl:'https://example.invalid/v1',model:saved?'vision-model':'',hasKey:saved,billing:plan?'chatgpt':'api',chatGptConnected:plan,chatGptModel:plan?'plan-model':''};if(method==='notes.ai.billing'){plan=args.plan;return{configured:true}};if(method==='notes.ai.models')return delayed?{reqId:'models-'+calls.length}:{models:[{id:'vision-model',name:'Vision',vision:true},{id:'other',name:'Other'}]};return{configured:true}}}
 
  w.eval(source);return{dom,w,calls,dialogs,handlers}
 }
@@ -104,5 +104,29 @@ test('thinking restores the saved value and closing does not change it',async()=
   const call=h.w.AB.call.bind(h.w.AB);h.w.AB.call=(method,args)=>{const result=call(method,args);return method==='notes.ai.settings'?{...result,thinking:'low'}:result}
   await h.w.KalamosNotesAI.openSettings();const select=h.w.document.querySelector('[name=thinking]');assert.equal(select.value,'low')
   select.value='none';h.w.KalamosNotesAI.closeSettings();assert.equal(h.calls.some(c=>c.method==='notes.ai.configure'),false)
+ }finally{h.dom.window.close()}
+})
+
+
+test('ChatGPT connection opens native account controls without submitting an API key',async()=>{
+ const h=fixture();try {
+  await h.w.KalamosNotesAI.openSettings()
+  ;[...h.w.document.querySelectorAll('button')].find(b=>b.textContent==='Continue with ChatGPT').click()
+  assert.equal(h.calls.at(-1).method,'notes.ai.chatgpt');assert.equal(Object.keys(h.calls.at(-1).args).length,0)
+  assert.equal(h.calls.filter(c=>c.method==='notes.ai.configure').length,0)
+  assert.equal(h.w.document.querySelector('#notes-ai-settings'),null)
+ }finally{h.dom.window.close()}
+})
+test('plan billing shows its model and requires an explicit switch to API billing',async()=>{
+ const h=fixture({plan:true});try {
+  await h.w.KalamosNotesAI.openSettings()
+  const form=h.w.document.querySelector('form')
+  assert.match(form.textContent,/ChatGPT plan selected.*plan-model/)
+  assert.equal(form.querySelector('[name=apiKey]').parentElement.hidden,true)
+  assert.equal(form.querySelector('[name=apiKey]').required,false)
+  assert.equal(h.calls.some(c=>c.method==='notes.ai.models'),false)
+  ;[...form.querySelectorAll('button')].find(b=>b.textContent==='Use API provider').click()
+  const call=h.calls.find(c=>c.method==='notes.ai.billing');assert.equal(call.args.plan,false)
+  await new Promise(r=>setTimeout(r,0));assert.equal(h.w.document.querySelector('[name=apiKey]').parentElement.hidden,false)
  }finally{h.dom.window.close()}
 })

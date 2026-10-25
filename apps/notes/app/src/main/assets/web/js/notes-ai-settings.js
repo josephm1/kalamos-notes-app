@@ -16,6 +16,11 @@
     const explanation = document.createElement('p')
     explanation.textContent = 'Format with AI sends this page to your chosen provider. Choose a model that accepts images.'
     form.append(explanation)
+    const account = document.createElement('button'); account.type = 'button'; account.textContent = 'Continue with ChatGPT'
+    const apiBilling = document.createElement('button'); apiBilling.type = 'button'; apiBilling.textContent = 'Use API provider'; apiBilling.hidden = true
+    form.append(account, apiBilling)
+    account.onclick = () => { const result = AB.call('notes.ai.chatgpt', {}); if (result.err) status.textContent = result.err; else finish() }
+    apiBilling.onclick = () => { const result = AB.call('notes.ai.billing', {plan:false}); if (result.err) status.textContent = result.err; else { finish(); void openSettings() } }
     const fields = {}
     function field(name, label, type) {
       const wrapper = document.createElement('label'); wrapper.textContent = label
@@ -144,7 +149,16 @@
     if (config.err) status.textContent = config.err
     populate(fields.model.value, false)
     document.body.append(overlay); opening = false
-    if (config.hasKey) void loadModels()
+    const planMode = config.billing === 'chatgpt'
+    account.textContent = config.chatGptConnected ? 'Manage ChatGPT connection' : 'Continue with ChatGPT'
+    if (planMode) {
+      apiBilling.hidden = false
+      explanation.textContent = 'ChatGPT plan selected' + (config.chatGptModel ? ' · ' + config.chatGptModel : '') + '. Page formatting uses this account’s plan allowance. Review account access and available models in Manage ChatGPT connection.'
+      for (const element of [fields.baseUrl.parentElement, fields.apiKey.parentElement, modelLabel, manualLabel, thinkingLabel, clear, save]) { element.hidden = true; element.style.display = 'none' }
+      for (const input of form.querySelectorAll('input,select')) input.required = false
+      form.onsubmit = event => { event.preventDefault(); finish() }
+      account.focus()
+    } else if (config.hasKey) void loadModels()
     else fields.baseUrl.focus()
   }
   window.KalamosNotesAI = {openSettings,closeSettings(){if(!closeCurrent)return false;closeCurrent();return true}}

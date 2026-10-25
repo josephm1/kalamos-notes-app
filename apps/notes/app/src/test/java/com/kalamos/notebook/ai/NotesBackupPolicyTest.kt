@@ -28,6 +28,10 @@ class NotesBackupPolicyTest {
             }
             assertEquals(copies, counts["scribe_secrets.xml"])
             assertEquals(copies, counts["scribe_secrets.xml.bak"])
+            for (name in listOf("secrets", "chatgpt-state", "chatgpt-billing")) {
+                assertEquals(copies, counts["$name.xml"])
+                assertEquals(copies, counts["$name.xml.bak"])
+            }
         }
     }
 }

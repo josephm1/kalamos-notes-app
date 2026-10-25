@@ -49,6 +49,16 @@ private class NotesBridge(private val fragment: Fragment, webView: WebView) :
             "{}"
         }
         "notes.ai.models" -> models.load(args)
+        "notes.ai.chatgpt" -> {
+            val activity=fragment.requireActivity()
+            activity.runOnUiThread { activity.startActivity(android.content.Intent(activity,com.kalamos.notebook.auth.ChatGptActivity::class.java)) }
+            "{}"
+        }
+        "notes.ai.billing" -> {
+            com.kalamos.notebook.auth.ChatGptPlan.initialize(fragment.requireContext())
+            com.kalamos.notebook.auth.ChatGptPlan.setEnabled(args.optBoolean("plan"))
+            com.kalamos.notebook.ai.NotesAiSettings(fragment.requireContext()).status().toString()
+        }
         "notes.ai.settings" -> com.kalamos.notebook.ai.NotesAiSettings(fragment.requireContext()).status().toString()
         "notes.ai.configure" -> com.kalamos.notebook.ai.NotesAiSettings(fragment.requireContext()).save(args).toString()
         "notes.templates.list" -> {

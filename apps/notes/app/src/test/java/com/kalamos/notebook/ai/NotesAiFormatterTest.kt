@@ -72,4 +72,32 @@ class NotesAiFormatterTest {
         }
     }
 
+    @Test fun chatGptPlanUsesOfficialResponsesAndOnlyCompletedTextBecomesAProposal() {
+        val (source, manifest) = image()
+        val plan = NotesAiSettings.Provider("https://untrusted.invalid/v1", "plan-model", "fixture-token", chatGptAccountId="fixture-account")
+        val formatter = NotesAiFormatter(plan) { request ->
+            assertEquals("https://api.openai.com/v1/responses", request.url.toString())
+            assertEquals("Bearer fixture-token", request.header("Authorization"))
+            assertEquals("text/event-stream", request.header("Accept"))
+            val buffer=Buffer(); request.body!!.writeTo(buffer); val body=JSONObject(buffer.readUtf8())
+            assertFalse(body.getBoolean("store")); assertTrue(body.getBoolean("stream"))
+            assertFalse(body.has("messages")); assertFalse(body.has("reasoning"))
+            val parts=body.getJSONArray("input").getJSONObject(0).getJSONArray("content")
+            assertEquals("input_image",parts.getJSONObject(1).getString("type"))
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"# Plan note\"}\n\n" +
+                "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n"
+        }
+        assertEquals("# Plan note", formatter.format(source,manifest).getString("markdown"))
+    }
+    @Test fun chatGptPartialFailedOrIncompleteStreamsNeverProduceAProposal() {
+        val (source,manifest)=image()
+        val plan=provider.copy(chatGptAccountId="fixture-account")
+        val delta="data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n"
+        for (tail in listOf("", "data: [DONE]\n\n", "data: {\"type\":\"response.failed\"}\n\n",
+            "data: {\"type\":\"response.incomplete\"}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"incomplete\"}}\n\n")) {
+            assertThrows(Exception::class.java) { NotesAiFormatter(plan) { delta+tail }.format(source,manifest) }
+        }
+    }
+
 }

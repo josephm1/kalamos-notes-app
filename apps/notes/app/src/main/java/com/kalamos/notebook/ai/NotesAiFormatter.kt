@@ -19,30 +19,33 @@ class NotesAiFormatter(private val provider: NotesAiSettings.Provider,
     fun format(imageFile: File, metadata: JSONObject): JSONObject {
         require(imageFile.length() in 1..1_500_000) { "The page image is unavailable or too large. Prepare the page again." }
         val image=imageFile.readBytes()
-        val content = JSONArray().put(JSONObject().put("type", "text").put("text", MARKDOWN_PROMPT))
         require(image.size in 1..1_500_000) { "Page image is too large" }
-        content.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:image/jpeg;base64," + Base64.encodeToString(image, Base64.NO_WRAP))))
-        val body = JSONObject().put("model", provider.model).put("stream", false)
-            .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
-        // Omission means provider default, which can enable expensive high thinking.
-        if (provider.thinking != "default") {
-            when (provider.baseUrl.toHttpUrl().host) {
-                "api.deepseek.com" -> {
-                    body.put("thinking", JSONObject().put("type", if (provider.thinking == "none") "disabled" else "enabled"))
-                    if (provider.thinking != "none") body.put("reasoning_effort", provider.thinking)
-                }
-                "openrouter.ai" -> body.put("reasoning", JSONObject().put("effort", provider.thinking))
-                    .put("provider", JSONObject().put("require_parameters", true))
-                else -> body.put("reasoning_effort", provider.thinking)
+        val imageUrl="data:image/jpeg;base64," + Base64.encodeToString(image, Base64.NO_WRAP)
+        val plan=provider.chatGptAccountId!=null
+        val body: JSONObject
+        if(plan) {
+            val content=JSONArray().put(JSONObject().put("type","input_text").put("text",MARKDOWN_PROMPT))
+                .put(JSONObject().put("type","input_image").put("image_url",imageUrl))
+            body=JSONObject().put("model",provider.model).put("store",false).put("stream",true)
+                .put("input",JSONArray().put(JSONObject().put("role","user").put("content",content)))
+        } else {
+            val content=JSONArray().put(JSONObject().put("type","text").put("text",MARKDOWN_PROMPT))
+                .put(JSONObject().put("type","image_url").put("image_url",JSONObject().put("url",imageUrl)))
+            body=JSONObject().put("model",provider.model).put("stream",false)
+                .put("messages",JSONArray().put(JSONObject().put("role","user").put("content",content)))
+            if(provider.thinking!="default")when(provider.baseUrl.toHttpUrl().host) {
+                "api.deepseek.com" -> {body.put("thinking",JSONObject().put("type",if(provider.thinking=="none") "disabled" else "enabled"));if(provider.thinking!="none")body.put("reasoning_effort",provider.thinking)}
+                "openrouter.ai" -> body.put("reasoning",JSONObject().put("effort",provider.thinking)).put("provider",JSONObject().put("require_parameters",true))
+                else -> body.put("reasoning_effort",provider.thinking)
             }
         }
-        val request = Request.Builder().url(provider.chatUrl).header("Authorization", "Bearer ${provider.key}")
-            .post(body.toString().toRequestBody("application/json".toMediaType())).build()
-        val response = JSONObject(execute(request)).getJSONArray("choices").getJSONObject(0)
-        require(response.optString("finish_reason") == "stop") { "The AI response was incomplete. Your note is unchanged." }
-        val rawText = response.getJSONObject("message").get("content")
-        require(rawText is String) { "The AI provider returned unsupported content" }
-        val text = rawText.trim()
+        val request=Request.Builder().url(if(plan) "https://api.openai.com/v1/responses" else provider.chatUrl).header("Authorization","Bearer ${provider.key}")
+            .header("Accept",if(plan) "text/event-stream" else "application/json").post(body.toString().toRequestBody("application/json".toMediaType())).build()
+        val text=if(plan) NotesPlanResponses.text(execute(request)) else {
+            val response=JSONObject(execute(request)).getJSONArray("choices").getJSONObject(0)
+            require(response.optString("finish_reason")=="stop") { "The AI response was incomplete. Your note is unchanged." }
+            val rawText=response.getJSONObject("message").get("content");require(rawText is String) { "The AI provider returned unsupported content" };rawText.trim()
+        }
         require(text.isNotBlank() && text.toByteArray().size <= 70000 && !text.contains('\u0000')) { "The AI response is empty or too large" }
         val proposal = JSONObject().put("schema", Bundle.PROPOSAL_SCHEMA).put("proposalId", UUID.randomUUID().toString())
             .put("documentId", metadata.getString("documentId")).put("baseRevisionId", metadata.getString("revisionId"))
@@ -59,7 +62,7 @@ class NotesAiFormatter(private val provider: NotesAiSettings.Provider,
             val input = requireNotNull(response.body).byteStream()
             val output = java.io.ByteArrayOutputStream()
             val buffer = ByteArray(8192)
-            while (true) { val n = input.read(buffer); if (n < 0) break; require(output.size() + n <= 160000) { "AI response is too large" }; output.write(buffer, 0, n) }
+            while (true) { val n = input.read(buffer); if (n < 0) break; require(output.size() + n <= if(request.url.encodedPath.endsWith("/responses")) 2_000_000 else 160000) { "AI response is too large" }; output.write(buffer, 0, n) }
             output.toString("UTF-8")
         }
     }

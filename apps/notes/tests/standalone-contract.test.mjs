@@ -8,8 +8,10 @@ const read = path => readFileSync(new URL(path, repo), 'utf8')
 test('Notes exposes its launcher, generic Markdown share target and document boundary without retired Agent endpoints', () => {
   const manifest = read('apps/notes/app/src/main/AndroidManifest.xml')
   assert.match(manifest, /android:name="\.KalamosApp"/)
-  assert.equal([...manifest.matchAll(/<activity\s/g)].length, 3)
+  assert.equal([...manifest.matchAll(/<activity\s/g)].length, 4)
   assert.match(manifest, /android:name="\.sharing.MarkdownImportActivity"/)
+  assert.match(manifest, /android:name="\.auth.ChatGptActivity"/)
+  assert.ok(manifest.includes('${applicationId}.chatgpt'))
   for(const mime of ['text/plain','text/markdown','text/x-markdown'])assert.ok(manifest.includes(mime))
   assert.doesNotMatch(manifest, /com\.kalamos\.agent|PICK_NOTE|IMPORT_NOTE|NotePickerActivity|NoteImportActivity/)
   for (const file of ['NotePickerActivity.kt', 'NoteImportActivity.kt', 'AgentWriting.kt']) {
