@@ -1,21 +1,27 @@
 package com.kalamos.notebook.ai
 
 import android.content.Context
+import com.kalamos.notebook.auth.ChatGptPlan
+import com.kalamos.notebook.auth.OpenAiHttp
 import com.kalamos.notebook.app.Secrets
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 
 /** Notes-owned configuration. Credential values never return to JavaScript or enter jobs/bundles. */
 class NotesAiSettings(context: Context, private val secretFactory: () -> Secrets = { Secrets(context) }) {
+    init { ChatGptPlan.initialize(context) }
     private val prefs = context.getSharedPreferences("notes-ai", Context.MODE_PRIVATE)
     private val secrets by lazy(secretFactory)
-    data class Provider(val baseUrl: String, val model: String, val key: String, val thinking: String = DEFAULT_THINKING) {
+    data class Provider(val baseUrl: String, val model: String, val key: String, val thinking: String = DEFAULT_THINKING, val chatGptAccountId: String? = null) {
         init { require(thinking in THINKING_LEVELS) { "Invalid thinking level" } }
         val chatUrl get() = baseUrl.trimEnd('/') + "/chat/completions"
     }
     fun status(): JSONObject = JSONObject().put("baseUrl", prefs.getString("baseUrl", DEFAULT_URL))
         .put("model", prefs.getString("model", "")).put("thinking", prefs.getString("thinking", DEFAULT_THINKING)).put("hasKey", secrets.has(KEY))
-        .put("configured", secrets.has(KEY) && !prefs.getString("model", "").isNullOrBlank())
+        .put("configured", if(ChatGptPlan.enabled()) ChatGptPlan.configured() && !ChatGptPlan.accounts().active()?.optString("model").isNullOrBlank() else secrets.has(KEY) && !prefs.getString("model", "").isNullOrBlank())
+        .put("billing",if(ChatGptPlan.enabled()) "chatgpt" else "api")
+        .put("chatGptConnected",ChatGptPlan.configured())
+        .put("chatGptModel",runCatching { ChatGptPlan.accounts().active()?.optString("model").orEmpty() }.getOrDefault(""))
     fun save(input: JSONObject): JSONObject {
         val url = baseUrl(input.getString("baseUrl"))
         val model = input.getString("model").trim()
@@ -53,6 +59,12 @@ class NotesAiSettings(context: Context, private val secretFactory: () -> Secrets
         require(key.length <= 4096 && key.all { it.code in 33..126 }) { "Invalid API key" }
     }
     fun provider(): Provider {
+        if(ChatGptPlan.enabled()) {
+            check(ChatGptPlan.configured()) { "Reconnect ChatGPT and grant plan permission in Notes AI settings. No API-key fallback was used." }
+            val account=checkNotNull(ChatGptPlan.accounts().active());val id=account.getString("client_id");val model=account.optString("model")
+            check(model.isNotBlank()) { "Choose a ChatGPT model in Notes AI settings" }
+            return Provider(OpenAiHttp.API,model,ChatGptPlan.token(id),prefs.getString("thinking",DEFAULT_THINKING) ?: DEFAULT_THINKING,id)
+        }
         val status = status()
         check(status.getBoolean("configured")) { "Configure Format with AI in Notes → Library menu → AI settings" }
         val key = secrets.substitute("{{secret:$KEY}}")

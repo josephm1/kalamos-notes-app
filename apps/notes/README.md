@@ -145,3 +145,9 @@ Headings, prose, lists, checkbox state and supported inline styling remain edita
 fenced code use read-only page previews while retaining their Markdown for sharing. These previews
 are included in page images, PDFs and saved thumbnails. Import Markdown from the library and
 incoming Android shares use the same processing path.
+
+## ChatGPT plan connection
+
+Library menu → AI settings → Continue with ChatGPT opens native browser sign-in. Grant plan permission, load the available model catalog, choose a model that accepts images, and select Use ChatGPT plan. Formatting uses the selected account's plan allowance and keeps the existing review-before-apply proposal workflow. Account eligibility and workspace policy can limit access.
+
+Use API provider returns to the separately saved API-key configuration. Plan errors do not fall back to API billing. Native encrypted account credentials are excluded from backups and never enter the page, bridge status or notebook content.

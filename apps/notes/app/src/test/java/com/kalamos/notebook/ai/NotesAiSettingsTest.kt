@@ -15,7 +15,7 @@ import org.robolectric.annotation.Config
 class NotesAiSettingsTest {
     private val secure = NotesAiTestSecrets()
     private val context get()=RuntimeEnvironment.getApplication()
-    @Before fun clean(){context.getSharedPreferences("notes-ai",0).edit().clear().commit();context.getSharedPreferences("scribe_secrets",0).edit().clear().commit()}
+    @Before fun clean(){context.getSharedPreferences("chatgpt-billing",0).edit().clear().commit();context.getSharedPreferences("notes-ai",0).edit().clear().commit();context.getSharedPreferences("scribe_secrets",0).edit().clear().commit()}
     private fun input(key:String="fixture-key")=JSONObject().put("baseUrl","https://example.invalid/v1").put("model","vision-model").put("apiKey",key)
     @Test fun ownConfigurationKeepsKeyNativeAndBlankInputPreservesIt(){
         val settings=secure.settings(context);assertFalse(settings.status().getBoolean("configured"))
@@ -64,6 +64,17 @@ class NotesAiSettingsTest {
         assertThrows(IllegalStateException::class.java){settings.save(input())}
         assertFalse(settings.status().getBoolean("hasKey"))
         assertFalse(context.getSharedPreferences("scribe_secrets",0).all.toString().contains("fixture-key"))
+    }
+
+    @Test fun disconnectedPlanNeverUsesTheSavedApiKey() {
+        val settings=secure.settings(context)
+        settings.save(input())
+        context.getSharedPreferences("chatgpt-billing",0).edit().putBoolean("usePlan",true).commit()
+        assertEquals("chatgpt",settings.status().getString("billing"))
+        assertFalse(settings.status().getBoolean("configured"))
+        assertThrows(IllegalStateException::class.java) { settings.provider() }
+        com.kalamos.notebook.auth.ChatGptPlan.setEnabled(false)
+        assertEquals("fixture-key",settings.provider().key)
     }
 
 }

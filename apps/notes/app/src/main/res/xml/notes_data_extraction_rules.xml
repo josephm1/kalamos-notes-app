@@ -1,7 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
-    <cloud-backup><exclude domain="sharedpref" path="scribe_secrets.xml" />
-        <exclude domain="sharedpref" path="scribe_secrets.xml.bak" /></cloud-backup>
-    <device-transfer><exclude domain="sharedpref" path="scribe_secrets.xml" />
-        <exclude domain="sharedpref" path="scribe_secrets.xml.bak" /></device-transfer>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="scribe_secrets.xml" />
+        <exclude domain="sharedpref" path="scribe_secrets.xml.bak" />
+        <exclude domain="sharedpref" path="secrets.xml" />
+        <exclude domain="sharedpref" path="secrets.xml.bak" />
+        <exclude domain="sharedpref" path="chatgpt-state.xml" />
+        <exclude domain="sharedpref" path="chatgpt-state.xml.bak" />
+        <exclude domain="sharedpref" path="chatgpt-billing.xml" />
+        <exclude domain="sharedpref" path="chatgpt-billing.xml.bak" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="scribe_secrets.xml" />
+        <exclude domain="sharedpref" path="scribe_secrets.xml.bak" />
+        <exclude domain="sharedpref" path="secrets.xml" />
+        <exclude domain="sharedpref" path="secrets.xml.bak" />
+        <exclude domain="sharedpref" path="chatgpt-state.xml" />
+        <exclude domain="sharedpref" path="chatgpt-state.xml.bak" />
+        <exclude domain="sharedpref" path="chatgpt-billing.xml" />
+        <exclude domain="sharedpref" path="chatgpt-billing.xml.bak" />
+    </device-transfer>
 </data-extraction-rules>

@@ -1018,3 +1018,11 @@ expectation failure; later stages ran separately. Both Notes targets and Agora p
 Notes/Agora updated data-preserving; pulled installed hashes match. No physical pen/task/panel or paid
 model acceptance claimed. Standard candidate built only for disconnected Huion. Private GitHub awaits
 user acceptance and explicit instruction. Evidence: artifacts/notes-agora-redesign-2026-10-12/VERIFICATION.md.
+
+## 25 October 2026 — ChatGPT account and plan connection
+
+Notes AI settings now opens app-owned native ChatGPT account controls: browser PKCE/OIDC sign-in, saved accounts, explicit plan consent, live model catalog, account selection and logout. Account secrets use an Android Keystore vault and are excluded from cloud backup and device transfer, including interrupted SharedPreferences backups. Credentials never enter the WebView bridge, notebooks or proposals. Auth is adapted from LearnHarness with its AGPL license retained; no sibling dependency or source-sync script was added.
+
+Plan formatting uses the official Responses endpoint with `store:false` and `stream:true`, then creates the existing reviewable page proposal only after `response.completed`. Partial, failed and incomplete streams cannot become revisions. API-key settings remain separately selectable; plan errors never fall back to a saved API key. Plan requests use the model's default reasoning behavior rather than carrying API-provider thinking settings across billing routes. Account eligibility, consent and live inference still require owner sign-in. Device ink and refresh policy are unchanged.
+
+Validation: all 123 Notes JVM tests and 135 Notes web checks pass; the Standard Android APK builds. This includes signed identity/PKCE/callback tests, completed-stream-only proposals, disconnected-plan refusal to use a saved API key and backup exclusions. Candidate: `builds/2026-10-25/kalamos-notes/Kalamos-Notes-standard.apk` in the parent working directory; SHA256 `0ba9a6253a22ccdd0ab71a55ac6a828a7d43b80ae23dea53df5dff2c7278f4c8`. No device was connected to ADB at completion, so this candidate was not installed. Live sign-in and physical acceptance remain with the owner.
