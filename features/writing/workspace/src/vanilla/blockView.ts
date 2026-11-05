@@ -1,4 +1,4 @@
-// Vanilla port of src/reader/BlockView.tsx.
+// Render document blocks with editable inline ink.
 
 import type { Block } from "../markdown/parse";
 import type { InlineInkRun } from "../ink/types";

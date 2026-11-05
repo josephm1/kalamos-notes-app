@@ -25,13 +25,20 @@ describe("sidecar schema", () => {
     expect(res.ok).toBe(false);
   });
 
-  it("migrates a v0 sidecar lacking unplacedInk", () => {
+  it("rejects a retired v0 sidecar without changing it", () => {
     const sc = createEmptySidecar("a.md", "h") as Record<string, unknown>;
     delete sc.unplacedInk;
     sc.schemaVersion = 0;
     const res = validateSidecar(sc);
-    expect(res.ok).toBe(true);
-    if (res.ok) expect(Array.isArray(res.sidecar.unplacedInk)).toBe(true);
+    expect(res.ok).toBe(false);
+    expect(sc.schemaVersion).toBe(0);
+    expect(sc.unplacedInk).toBeUndefined();
+  });
+
+  it("rejects a current sidecar missing required ink arrays", () => {
+    const sc = createEmptySidecar("a.md", "h") as Record<string, unknown>;
+    delete sc.unplacedInk;
+    expect(validateSidecar(sc).ok).toBe(false);
   });
 });
 

@@ -5,7 +5,6 @@ import {
   anchorOffsetForInsert,
   orderedFlow,
   retokenize,
-  collapseSpacing,
   type ReflowDoc,
 } from "./reflowModel";
 
@@ -68,32 +67,4 @@ describe("reflowModel", () => {
     expect(next.inserts[0].afterWord).toBe(0);
   });
 
-  it("collapses visible spacing and retained whitespace before handwriting", () => {
-    const d = doc(
-      ["a", "b"],
-      [
-        { id: "gap", afterWord: 0, kind: "gap", width: 80, height: 44, strokes: [] },
-        { id: "lines", afterWord: 0, kind: "line", width: 0, height: 88, lines: 2, strokes: [] },
-        {
-          id: "ink",
-          afterWord: 0,
-          kind: "ink",
-          width: 50,
-          height: 44,
-          flowAdvance: 760,
-          baselineOffset: 36,
-          strokes: [],
-        },
-      ]
-    );
-
-    const next = collapseSpacing(d);
-    expect(next.inserts).toHaveLength(1);
-    expect(next.inserts[0]).toMatchObject({
-      id: "ink",
-      kind: "ink",
-      baselineOffset: 36,
-    });
-    expect(next.inserts[0].flowAdvance).toBeUndefined();
-  });
 });

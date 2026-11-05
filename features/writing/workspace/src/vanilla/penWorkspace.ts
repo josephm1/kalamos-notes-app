@@ -24,7 +24,7 @@ import { wrapBoxText, placeBoxWords, fitBoxWidth, ruledTextSize, WORKSPACE_FONT_
 import { insertTextFlow } from "../reflow/insertText";
 import type { Block } from "../markdown/parse";
 import type { InkPoint, InkStroke, InlineInkRun, Bounds } from "../ink/types";
-import { boundsOfPoints, boundsUnion, emptyBounds } from "../ink/types";
+import { boundsOfPoints, boundsUnion } from "../ink/types";
 import {
   appendFiltered,
   fillStroke,
@@ -54,6 +54,7 @@ import {
 import type { Preferences } from "../storage/db";
 import {
   freeInkLaneIndex,
+  inkStrokesBounds as strokesBounds,
   normalizeInkStrokes,
   packedInkTop,
   ruledBaselineOffset,
@@ -62,7 +63,7 @@ import {
   inkWordMatchScore,
   translateInkStrokes,
 } from "../editor/inkPlacement";
-import type { CommitPayload } from "../editor/PenWorkspace";
+import type { CommitPayload } from "../editor/commitPayload";
 import { svg } from "./dom";
 import { clusterInkStrokesByWord, inkStrokeAttachmentDistance, inkStrokeStartsInBody } from "../editor/inkGrouping";
 import { MagnifyPad, type MagnifyContext } from "./magnifyPad";
@@ -246,11 +247,8 @@ const dlog = import.meta.env.DEV
       console.log(`[vpw:${tag}]`, data === undefined ? "" : JSON.stringify(data))
   : () => {};
 
-function strokesBounds(strokes: InkStroke[], pad = 0): Bounds {
-  let b = emptyBounds();
-  for (const s of strokes) b = boundsUnion(b, boundsOfPoints(s.points));
-  if (strokes.length === 0) return b;
-  return { x: b.x - pad, y: b.y - pad, width: b.width + pad * 2, height: b.height + pad * 2 };
+function updateInkAttribute(element: SVGElement, name: string, value: string) {
+  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
 }
 
 function wordIndexForOffset(words: string[], offset: number): number {
@@ -403,6 +401,9 @@ export class PenWorkspace {
   private lastInkEndMs = 0;
   private delegatedInkPresenter: DelegatedInkTrailPresenterLike | null = null;
   private liveCanvasBounds: Bounds | null = null;
+  private liveStrokeFrame: number | null = null;
+  private liveStrokeGeneration = 0;
+  private liveStrokePrediction: InkPoint[] = [];
   private renderedInkStrokes = new Map<string, InkStroke[]>();
   private nativeModelDirty = false;
   private checkboxActivations = new Map<string, PenButtonActivation>();
@@ -578,7 +579,18 @@ export class PenWorkspace {
 
     this.ro = new ResizeObserver(() => {
       const width = this.containerEl.clientWidth;
-      if (width <= 0 || width === this.width) return;
+      if (width <= 0) return;
+      if (width === this.width) {
+        // Height-only changes (toolbar/IME/rotation settling) can expose blank rows without
+        // changing document layout. Keep Standard's live presentation area over that paper.
+        // Native handoff frames and Bigme daemon composition retain their own sizing owner.
+        if (!this.props.native && !this.nativeWebHandoff) {
+          this.sizeCanvas();
+          const stroke = this.gesture.liveStroke;
+          if (stroke) this.drawLiveStroke(stroke.points, stroke);
+        }
+        return;
+      }
       this.settleSpacingGesture(true);
       this.lastSpacing = null;
       this.width = width;
@@ -645,6 +657,7 @@ export class PenWorkspace {
   arrangeAttachments(): void { this.afterNativeFlush(() => this.setTool('objects')); }
 
   destroy() {
+    this.cancelLiveStrokeFrame();
     this.destroyed = true; this.attachmentImages.dispose(); this.pageObjectNodes.clear();
     this.settleSpacingGesture(true);
     this.root.removeEventListener("pointerdown", this.observePenActivity, true);
@@ -1015,7 +1028,7 @@ export class PenWorkspace {
     );
   }
 
-  // ---- Layout (mirrors the React `layout` useMemo) ----
+  // ---- Canonical document layout ----
   private computeLayout(): Layout {
     const doc = this.doc;
     const flow = orderedFlow(doc);
@@ -1306,9 +1319,15 @@ export class PenWorkspace {
 
   private sizeCanvas() {
     const pixelWidth = Math.round(this.width * this.dpr);
-    const pixelHeight = Math.round(this.layout.height * this.dpr);
+    // Blank visible rows are writable before committed content reaches them. A content-sized
+    // canvas clipped their first live stroke and the delegated compositor trail; growing it at
+    // pen-up also reallocated the backing buffer on successive new lines. Keep Standard's
+    // transient canvas at least as tall as the visible paper. Document height/scrolling and
+    // native daemon/snapshot geometry still come from their existing authorities.
+    const height = this.props.native ? this.layout.height : Math.max(this.layout.height, this.containerEl.clientHeight);
+    const pixelHeight = Math.round(height * this.dpr);
     const cssWidth = `${this.width}px`;
-    const cssHeight = `${this.layout.height}px`;
+    const cssHeight = `${height}px`;
     // Assigning either canvas dimension destroys its drawing state and reallocates the GPU backing
     // store. Relayout runs after every completed stroke, but the ruled page size usually has not
     // changed; keep that common path allocation-free.
@@ -1320,10 +1339,11 @@ export class PenWorkspace {
   }
 
   private clearCanvas() {
+    this.cancelLiveStrokeFrame();
     const ctx = this.canvasEl.getContext("2d");
     if (ctx) {
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-      ctx.clearRect(0, 0, this.width, this.layout.height);
+      ctx.clearRect(0, 0, this.canvasEl.width / this.dpr, this.canvasEl.height / this.dpr);
     }
     this.liveCanvasBounds = null;
   }
@@ -1332,6 +1352,7 @@ export class PenWorkspace {
    * every pointer sample made the Mali driver process a full-surface GPU operation even though the
    * canvas contains only the current stroke. */
   private clearLiveCanvas() {
+    this.cancelLiveStrokeFrame();
     const bounds = this.liveCanvasBounds;
     if (!bounds) return;
     const ctx = this.canvasEl.getContext("2d");
@@ -1413,7 +1434,7 @@ export class PenWorkspace {
       y: Math.max(0, bounds.y - pad),
       width: Math.min(this.width, bounds.x + bounds.width + pad) - Math.max(0, bounds.x - pad),
       height:
-        Math.min(this.layout.height, bounds.y + bounds.height + pad) -
+        Math.min(this.canvasEl.height / this.dpr, bounds.y + bounds.height + pad) -
         Math.max(0, bounds.y - pad),
     };
   }
@@ -1421,6 +1442,32 @@ export class PenWorkspace {
   private pushHistory() {
     this.historyStack.push(this.doc);
     this.redoStack = [];
+  }
+
+  private cancelLiveStrokeFrame() {
+    this.liveStrokeGeneration++;
+    if (this.liveStrokeFrame !== null) cancelAnimationFrame(this.liveStrokeFrame);
+    this.liveStrokeFrame = null;
+    this.liveStrokePrediction = [];
+  }
+
+  /** Keep all confirmed samples immediately; coalesce only expensive outline/raster work.
+   * Contact still paints synchronously. The latest prediction is presentation-only and is
+   * replaced on each input event, never appended to the authoritative stroke or history.
+   * Bigme never enters this path: its daemon remains the live ink owner.
+   */
+  private scheduleLiveStroke(stroke: InkStroke, prediction: InkPoint[]) {
+    this.liveStrokePrediction = prediction;
+    if (this.liveStrokeFrame !== null) return;
+    const generation = this.liveStrokeGeneration;
+    this.liveStrokeFrame = requestAnimationFrame(() => {
+      if (generation !== this.liveStrokeGeneration) return;
+      this.liveStrokeFrame = null;
+      const predicted = this.liveStrokePrediction;
+      this.liveStrokePrediction = [];
+      if (this.destroyed || this.nativeInkActive || this.gesture.liveStroke !== stroke) return;
+      this.drawLiveStroke(predicted.length ? stroke.points.concat(predicted) : stroke.points, stroke);
+    });
   }
 
   private undo = () => {
@@ -1995,23 +2042,21 @@ export class PenWorkspace {
           tiltY: ce.tiltY,
         });
       }
-      let renderPoints = stroke.points;
+      let prediction: InkPoint[] = [];
       // Delegated ink and application-side prediction must not run together because their two
       // predicted tails can fork. Preserve prediction as the fallback on unsupported browsers.
       if (!this.delegatedInkPresenter && typeof e.getPredictedEvents === "function") {
         const predicted = e.getPredictedEvents().slice(0, 3);
         if (predicted.length) {
-          renderPoints = stroke.points.concat(
-            predicted.map((pe) => ({
+          prediction = predicted.map((pe) => ({
               x: pe.clientX + offX,
               y: pe.clientY + offY,
               t: pe.timeStamp || performance.now(),
               pressure: pe.pressure,
-            }))
-          );
+            }));
         }
       }
-      this.drawLiveStroke(renderPoints, stroke);
+      this.scheduleLiveStroke(stroke, prediction);
       if (this.delegatedInkPresenter) {
         this.delegatedInkPresenter.updateInkTrailStartPoint(e, {
           color: stroke.color,
@@ -2054,6 +2099,7 @@ export class PenWorkspace {
     }
     if (this.nativeInkActive) return;
     if (e.pointerId !== this.gesture.pointerId) return;
+    this.cancelLiveStrokeFrame();
     const g = this.gesture;
     this.insertionGuide = null;
     dlog("gesture:end", { type: e.type, mode: g.mode, id: g.insertId });
@@ -3325,6 +3371,7 @@ export class PenWorkspace {
   }
 
   private setTool(tool: Tool, toolbarOnly = false) {
+    this.cancelLiveStrokeFrame();
     const beforePaper=this.containerEl.getBoundingClientRect();
     const beforeToolbar=this.toolbarEl.getBoundingClientRect();
     if (tool !== "select") this.directSelection = false;
@@ -5255,25 +5302,32 @@ export class PenWorkspace {
         previousStrokes.length !== ins.strokes.length ||
         previousStrokes.some((stroke, index) => stroke !== ins.strokes[index]);
       if (!svgEl) svgEl = svg("svg", {}) as SVGElement;
-      svgEl.setAttribute("viewBox", `${b.x} ${b.y} ${Math.max(1, b.width)} ${Math.max(1, b.height)}`);
-      svgEl.setAttribute("width", String(b.width));
-      svgEl.setAttribute("height", String(b.height));
-      svgEl.setAttribute("class", `rw-ink${this.selectedInsertId === ins.id ? " selected" : ""}`);
-      svgEl.setAttribute("data-insert-id", ins.id);
+      updateInkAttribute(svgEl, "viewBox", `${b.x} ${b.y} ${Math.max(1, b.width)} ${Math.max(1, b.height)}`);
+      updateInkAttribute(svgEl, "width", String(b.width));
+      updateInkAttribute(svgEl, "height", String(b.height));
+      updateInkAttribute(svgEl, "class", `rw-ink${this.selectedInsertId === ins.id ? " selected" : ""}`);
+      updateInkAttribute(svgEl, "data-insert-id", ins.id);
       // A preview is a pending transform only. Once the model owns the final position
       // (including Undo/cancel), never apply that delta again on the retained SVG node.
-      svgEl.style.transform = "";
-      (svgEl as unknown as HTMLElement).style.left = `${placement.x}px`;
-      (svgEl as unknown as HTMLElement).style.top = `${placement.y}px`;
+      if (svgEl.style.transform) svgEl.style.transform = "";
+      const left = `${placement.x}px`, top = `${placement.y}px`;
+      if (svgEl.style.left !== left) svgEl.style.left = left;
+      if (svgEl.style.top !== top) svgEl.style.top = top;
       if (pathsChanged) {
-        svgEl.replaceChildren();
-        for (const s of ins.strokes) {
+        // The usual next-letter append preserves older paths when normalization is a no-op.
+        // Erase, rebase, reorder and Undo still rebuild changed geometry authoritatively.
+        const appendOnly = previousStrokes && svgEl.children.length === previousStrokes.length &&
+          previousStrokes.length < ins.strokes.length &&
+          previousStrokes.every((stroke, index) => stroke === ins.strokes[index]);
+        if (!appendOnly) svgEl.replaceChildren();
+        for (let index = appendOnly ? previousStrokes.length : 0; index < ins.strokes.length; index++) {
+          const s = ins.strokes[index];
           const path = svg("path", { d: outlinePathD(strokeOutline(s.points, s.width, s.brushStyle)) });
           path.setAttribute("fill", s.color);
           svgEl.appendChild(path);
         }
       }
-      this.renderedInkStrokes.set(ins.id, ins.strokes.slice());
+      this.renderedInkStrokes.set(ins.id, ins.strokes);
       if (!retainedInk.has(ins.id)) frag.appendChild(svgEl);
       retainedInk.delete(ins.id);
     }

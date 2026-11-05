@@ -12,6 +12,9 @@ android {
     compileSdk = 34
 
     defaultConfig {
+        // Standard Android rollout first; Bigme review can opt into the same presentation.
+        buildConfigField("boolean", "NATIVE_LIBRARY", providers.gradleProperty("kalamos.nativeLibrary")
+            .orElse((kalamosDevice == "standard").toString()).get().toBooleanStrict().toString())
         applicationId = "com.kalamos.notebook"
         minSdk = 29
         targetSdk = 34
@@ -33,7 +36,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { viewBinding = true }
+    buildFeatures { viewBinding = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }

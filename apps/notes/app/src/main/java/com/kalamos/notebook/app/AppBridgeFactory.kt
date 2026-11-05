@@ -23,12 +23,17 @@ internal fun suppressNotesWebViewLongPress(webView: WebView) {
 
 private class NotesBridge(private val fragment: Fragment, webView: WebView) :
     LocalAppBridge(fragment.requireContext().applicationContext, webView) {
+    private val shelf = if (com.kalamos.notebook.BuildConfig.NATIVE_LIBRARY)
+        com.kalamos.notebook.library.NativeShelf(webView) else null
     private val agora = com.kalamos.notebook.exchange.AgoraBridge(fragment, ::emit)
     private val models = com.kalamos.notebook.ai.NotesAiModels(com.kalamos.notebook.ai.NotesAiSettings(context), ::emit)
     private val attachments=com.kalamos.notebook.attachments.NotesAttachments(fragment, ::emit)
     private val sharing=com.kalamos.notebook.sharing.NotesImageShare(context)
-    override fun onRelease() { attachments.release();sharing.release();models.release(); agora.release() }
+    override fun onRelease() { shelf?.release(); attachments.release();sharing.release();models.release(); agora.release() }
     override fun other(method: String, args: JSONObject): String? = when (method) {
+        "notes.shelf.capabilities" -> JSONObject().put("enabled", shelf != null).toString()
+        "notes.shelf.present" -> { requireNotNull(shelf).present(args); "{}" }
+        "notes.shelf.hide" -> { shelf?.hide(); "{}" }
         "notes.import.pending" -> com.kalamos.notebook.sharing.MarkdownImport.pending(context,fragment.requireActivity().intent).toString()
         "notes.import.ack" -> {
             com.kalamos.notebook.sharing.MarkdownImport.acknowledge(context,fragment.requireActivity().intent,args.getString("requestId"));"{}"

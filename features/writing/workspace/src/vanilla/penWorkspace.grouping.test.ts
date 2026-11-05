@@ -2,7 +2,6 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { parseMarkdown } from "../markdown/parse";
 import { DEFAULT_PREFERENCES } from "../storage/preferences";
 import type { InkPoint } from "../ink/types";
-import { convertLegacyPage } from "../kalamos/legacyNotebook";
 import { PenWorkspace } from "./penWorkspace";
 
 beforeAll(() => {
@@ -101,14 +100,6 @@ describe('selection lasso and copy', () => {
   });
 });
 
-
-it('reopens converted legacy strokes at their original full-width page coordinates',()=>{
-  const legacy={pageId:'p',strokes:[{width:3,points:[{x:10,y:20,p:.3,t:0},{x:25,y:40,p:.7,t:10}]},{width:2,points:[{x:270,y:100,p:.5,t:20},{x:300,y:120,p:.5,t:30}]}]};
-  const converted=convertLegacyPage(legacy,'Old notebook');
-  const host=document.createElement('div');document.body.appendChild(host);
-  const ws=new PenWorkspace(host,{block:parseMarkdown(converted.source)[0],existingRuns:converted.sidecar.inkRuns,prefs:DEFAULT_PREFERENCES,eink:true,native:true,onCommit(){},onCancel(){}});
-  expect(ws.getNativeInkStrokes().map(s=>s.pts.map(p=>[p.x,p.y]))).toEqual(legacy.strokes.map(s=>s.points.map(p=>[p.x,p.y])));
-});
 
 it('retired automatic shape correction never changes handwriting, even with an old preference',()=>{
   localStorage.setItem('write2.shapeCorrection','true');

@@ -1,8 +1,11 @@
 # Kalamos ruled-writing workspace
 
-This directory is the canonical source for the reusable ruled handwriting editor. The current Write,
-Scribe, To-do and Books builds receive it through the sibling `features/writing/android` Gradle
-library; no app copies or links to another app's source.
+The browser preview and both Android providers use one DOM writing implementation. The duplicate
+React editor/reader, its styles/dependencies and retired automatic-shape classifier have been removed.
+`npm run check:sources` rejects production modules with no current Android, browser or QA-tool consumer.
+
+This directory is the canonical source for the reusable ruled handwriting editor. Notes receives it through the `features/writing/android` Gradle library; no app copies or links
+to another app's source.
 
 ## Ownership
 
@@ -13,9 +16,9 @@ library; no app copies or links to another app's source.
   native-ink handoff stay in this feature.
 - The generated Android assets are build products. Do not edit them directly.
 
-`openNotebook(id)` is the current Write document host. The workspace also retains
-`openWorkspaceNotebook(id)` compatibility for a direct editor host, but the old Notes Planning UI
-and its legacy renderer are not present in this repository.
+`openNotebook(id)` opens the Markdown document host. `openWorkspaceNotebook(id)` opens Notes'
+direct ruled editor. Both are current host presentations of the same model and tools; there is
+no separate historical Planning renderer.
 
 Both host modes share native low-latency writing, Insert Space, Blank Lines/caret placement, erase,
 selection/move/delete, magnified writing, undo/redo and optional handwriting recognition.
@@ -34,11 +37,11 @@ Then build the affected app from the repository root. No sync or vendoring step 
 Native ink and e-ink refresh behavior require the physical device. Browser tests validate routing,
 layout, tools and persistence contracts only.
 
-## Storage compatibility
+## Storage schema
 
-The sidecar schema intentionally retains its existing `write2.sidecar` magic and compatible file
-names. These are persisted-data identifiers, not a source or build dependency. Renaming them would
-require an explicit document migration.
+The current sidecar uses schema version 1 and the `write2.sidecar` magic. These are format identifiers,
+not dependencies on historical source. Only the current version is accepted; the version-0 upgrade
+chain and retired handwriting-page converter have been removed.
 
 
 ## Notebook page overview

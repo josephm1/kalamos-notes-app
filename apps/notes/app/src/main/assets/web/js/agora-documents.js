@@ -153,7 +153,6 @@
     const id = target.notebookId
     try {
       await editor().checkpointWorkspace()
-      window.KalamosNotesMigration.ensure(id)
       const doc = await call('notes.agora.inspect', { notebookId: id })
       const ui = await sheet(session ? 'Return to Agora' : 'Work with Agora'); if(!ui)return
       paragraph(ui.body, doc.title + ' · Choose the pages to attach. Nothing is sent until you press Send in Agora.')
@@ -218,7 +217,6 @@
     try {
       notify('Preparing note images…')
       if(editor().isOpen())await editor().checkpointWorkspace()
-      window.KalamosNotesMigration.ensure(id)
       const index=JSON.parse(Bridge.getNotebookFile(id,'planning.pages.json'))
       if(!index.pages?.length || index.pages.length>32)throw Error('Share supports up to 32 pages per notebook.')
       const signature=()=>JSON.stringify([JSON.parse(Bridge.getNotebookFile(id,'planning.pages.json')),...index.pages.flatMap(page=>[Bridge.getNotebookFile(id,page.sourceFile),JSON.parse(Bridge.getNotebookFile(id,page.sidecarFile)||'{}')])],(key,value)=>key==='updatedAt'||key==='createdAt'?undefined:value)

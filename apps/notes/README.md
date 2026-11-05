@@ -3,17 +3,19 @@
 Notes owns its library chrome, creation sheet, routing, samples.
 It compiles the shared Android runtime, writing feature and selected device provider.
 
-Every plain notebook now uses the canonical ruled workspace (the former Planning experience).
-There is no Handwriting/Planning choice or separate Notes handwriting editor. New notebooks use
-`kind: planning` for persisted compatibility and blank metadata page records; the workspace alone
-owns visible rules, ink, text, spacing and native handoff.
+Standard Android builds use native notebook/folder shelf cards and direct background PNG decoding.
+The existing library controller still owns ordering, paging and notebook actions. Menus, selection,
+integration pickers and the writing workspace retain their current web implementation. Bigme keeps
+the web shelf by default during the initial standard-device test round. Set
+`-Pkalamos.nativeLibrary=true` to build the native shelf for either provider, or `false` to compare
+with the web shelf. This switch changes presentation only; it does not select an ink provider.
 
-Existing handwriting notebooks convert on first open or export. `notebook-migration.js` validates
-all original vectors, saves `handwriting.backup.json`, writes every ruled sheet and its index, then
-commits the discriminator. Original page files are retained. Failure stays on the shelf and never
-falls through to a blank editor. Already-converted notebooks are never reconverted on reopen.
-Legacy text entries enter the current ruled text model; their original positions/paper metadata
-remain in the backup. Old grid/blank/dotted/weekly/Cornell backgrounds become ruled sheets.
+Every notebook uses the canonical ruled workspace. The workspace alone owns visible rules, ink,
+text, spacing and native handoff. Notes accepts the current notebook/sidecar schema only;
+retired handwriting conversion, version-0 sidecar upgrades and embedded Markdown restoration
+appendices are no longer supported. Markdown imports use the current document parser.
+The existing `planning` discriminator and file names identify the current format; they are not
+an additional implementation or automatic upgrade path.
 
 Selection supports tapping a handwritten or typed text-box word to move it, or drawing a lasso
 from empty paper to select whole word blocks. A lasso that touches one letter includes the rest of
@@ -39,8 +41,9 @@ Automatic shape correction has been removed. Shapes in the expanded rail offers 
 Line, Triangle, Star and Free sketch, with outline/solid fill and attached Move/Size/Delete controls.
 These vectors are independent of ruled spacing and persist in the sidecar, previews and PDF export. All existing Planning spacing, text boxes, Zoom, scribble erase,
 separate pages, exports and fast native page-turn behavior remain in the canonical feature.
-New notebooks suggest Notebook 1, Notebook 2, etc. The counter survives renames/deletions; cancelling
-does not advance it. Names can be edited in the creation prompt or renamed from the shelf menu.
+New notebooks suggest Notebook 1, Notebook 2, etc., using the numbered titles currently in the
+library. Deleted/renamed titles no longer reserve numbers; cancelling creates nothing.
+Names can be edited in the creation prompt or renamed from the shelf menu.
 The creation catalogue offers Ruled, Week, Tasks, Meeting and Journal. Labels and end-of-row
 checkboxes use the canonical spacing model, save/reopen and Undo. Finger taps and small native pen
 taps toggle tasks; native taps are not saved ink and repaint only their small footprint. A notebook's
@@ -74,7 +77,7 @@ previews. A completely empty folder retains the large folder glyph. Notes withou
 are explicitly labelled empty.
 
 ```bash
-./lab/ui/run-preview.sh notes
+./tools/test-all.sh
 ./tools/gradle.sh :apps:notes:assembleDebug -Pkalamos.device=standard --no-daemon
 ./tools/gradle.sh :apps:notes:assembleDebug -Pkalamos.device=bigme --no-daemon
 node --test apps/notes/tests/planning-integration.test.mjs
@@ -131,7 +134,7 @@ Long-press a notebook → **Share Markdown** to send its current readable Markdo
 text share dialog. This includes edited AI-formatted headings, lists and task states from editable
 page elements, as well as source Markdown. No images, ink/layout JSON or embedded restoration
 appendix are included. Choose Agora or another text target. Ink-only notes should use **Share**
-for page images. Import still accepts older exports with an embedded restoration appendix.
+for page images. Import processes ordinary Markdown through the current parser.
 
 Notes is also a standard Android text/Markdown share target. Choose **Kalamos Notes** from another
 app’s share dialog to create and open a notebook without choosing a file. Incoming text and granted

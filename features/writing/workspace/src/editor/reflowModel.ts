@@ -30,10 +30,7 @@ export type Insert = {
   freeX?: number;
   freeY?: number;
   strokes: InkStroke[];
-  // NOTE: anchor positions (the slot coords strokes were last synced to) are
-  // deliberately NOT part of this model. They live in a ref in PenWorkspace —
-  // storing them in state let React rebase anchor-clearing updates against
-  // the follow effect's adoption updates, causing an infinite update loop.
+  // Transient gesture/preview state belongs to the editor, not the persisted model.
 };
 
 import type { TextBox } from "../sidecar/schema";
@@ -113,25 +110,5 @@ export function updateInsert(
   return {
     ...doc,
     inserts: doc.inserts.map((i) => (i.id === id ? { ...i, ...patch } : i)),
-  };
-}
-
-/**
- * Close every form of reflow whitespace. `flowAdvance` is the otherwise
- * invisible distance used to retain an ink run's original ruled-page
- * position. It must be cleared here as well as visible gap/line inserts;
- * otherwise Collapse closes typed content on the right while leaving the
- * handwriting stranded at its former x/line on the left.
- */
-export function collapseSpacing(doc: ReflowDoc): ReflowDoc {
-  return {
-    ...doc,
-    inserts: doc.inserts
-      .filter((insert) => insert.kind === "ink")
-      .map((insert) => {
-        const { flowAdvance: _flowAdvance, ...collapsed } = insert;
-        void _flowAdvance;
-        return collapsed;
-      }),
   };
 }

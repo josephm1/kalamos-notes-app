@@ -6,7 +6,7 @@ import { materializeSemantic, projectSemantic } from '../editor/semanticDocument
 import { DEFAULT_PREFERENCES } from '../storage/preferences';
 import { parseMarkdown } from '../markdown/parse';
 import { parseInlineMarkdown } from '../editor/inlineStyles';
-import type { CommitPayload } from '../editor/PenWorkspace';
+import type { CommitPayload } from '../editor/commitPayload';
 import type { InkPoint } from '../ink/types';
 const workspaces:PenWorkspace[]=[];
 beforeAll(()=>{

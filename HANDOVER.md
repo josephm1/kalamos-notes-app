@@ -1,3 +1,162 @@
+## 5 November 2026 — Huion lower-row fix accepted by owner
+
+Owner physically tested the installed lower-row candidate on Huion Note E and confirmed:
+“yep that works well”, explicitly accepting the fix and requesting a GitHub push.
+Treat the Standard blank-lower-row live-ink correction as owner-accepted on this device.
+Installed APK SHA256: d35f30a04df18ba38f47bf4393a02eb993b85799434d7f50130c3f509b1b1e67.
+The full shared suite passes (752 writing tests, 165 web/content checks, Android unit checks,
+typecheck and source graph); Standard and Bigme debug APKs build with canonical generated assets.
+This acceptance does not establish Bigme physical panel acceptance, which remains pending.
+
+## 5 November 2026 — Live ink on blank lower rows
+
+Owner narrowed the remaining Huion symptom to starting a word on a new line. Read-only WebView
+inspection found a 456.605 CSS-pixel canvas inside 928 pixels of visible paper. The live canvas
+and delegated ink presentationArea were sized to committed content, initially only three lines.
+The first stroke below that content could therefore be clipped until pen-up grew the canvas;
+successive lower strokes also resized its backing buffer. This is a reproduced rendering defect,
+not physical confirmation of every reported stutter's cause.
+
+Standard/browser live canvas now covers at least the visible paper, while preserving the existing
+committed document height, coordinates and model. Height-only ResizeObserver updates extend the
+presentation area and repaint a confirmed in-progress stroke. Dirty/full clears use actual canvas
+extent so writing below the old content height cannot leave wet-ink residue. Bigme native canvas
+sizing, daemon input, snapshots, refresh timing and ownership remain unchanged.
+
+Regression tests reproduce the old 132px buffer on 900px paper, cover several new rows without
+buffer reallocation, and preserve an active stroke through height-only resize. In real desktop
+Chromium, four strokes on previously blank rows had zero live raster pixels before pen-up with the
+old implementation; the fix paints all four immediately. Initial/final canvas heights change from
+132/492px before to 894/894px after, with identical saved point geometry. Synthetic testing disables
+delegated trails; actual compositor/device latency and Bigme panel acceptance remain owner-tested.
+Reference: https://github.com/WICG/ink-enhancement documents presentationArea clipping to the element.
+
+The previous clean standard APK was installed data-preserving on Huion G2DL3SH00568 and its hash
+verified (dcec5157c0dc0f5f8076ed49866836fa29d20fc5fd5ceba54377528cebb94d03).
+This lower-row correction was subsequently installed data-preserving and hash-verified; the owner
+accepted it as recorded above. Local build/native-migration/newline-verification.json records installation. No automated device pen gestures or notebook mutations were used.
+Validation: 752 writing tests, 165 Notes/content checks, typecheck, source graph and the full
+Android unit suite pass. Standard and Bigme debug candidates contain regenerated canonical assets.
+
+## 5 November 2026 — Shared source cleanup and stroke-boundary work
+
+Owner still reports stutter when starting strokes/words on the Huion. Read-only WebConsole logs
+show pen-down draw times mostly 0.1–0.4ms after the first 4.1ms contact, with dispatch around
+3.4–5.7ms and pen-up work up to 11.8ms in that sample. These do not establish the physical cause.
+
+The shared committed-ink renderer now caches bounds of immutable strokes/arrays with weak keys,
+keeps identity for zero-distance translations, skips unchanged SVG attributes and retains existing
+paths when appending a letter. Geometry changes and Undo still rebuild the affected vectors.
+Confirmed input, pressure/tilt/timestamps, prediction exclusion, native ownership, Bigme snapshots,
+refresh cadence and protective SDK handoffs retain their contracts.
+
+Removed the unused parallel React editor/reader, duplicate styles/preview entry, 13 dependency
+packages, retired edit state machine, unused export/drawing/automatic-shape implementations and
+unused spacing function. Browser preview now runs the canonical Android editor. Extracted the
+shared commit type and removed the geometry/render circular dependency. Both device builds consume
+this cleanup. Removed BigmeInkExperiment and its tests only after confirming no production caller;
+the Bigme provider and production daemon/panel safeguards remain. A source-graph check now rejects
+unreachable production TypeScript modules and runs in tools/test-all.sh. This is an audited cleanup,
+not a claim that all future maintenance work or all device latency has been eliminated.
+
+Validation: 750 current writing tests, 165 Notes/content checks, typecheck, source graph and the
+full Android unit suite pass. Removed test cases covered removed implementations; current behavior
+has additional bounds-cache, SVG identity, unchanged-word and Undo regressions. Production browser
+preview opens the sample reader and editor with no page errors. Android assets regenerated from
+canonical source. Standard and Bigme APKs built; Bigme-specific unit checks pass. New APKs are
+candidates, not installed or physically accepted.
+
+One desktop Chromium comparison of 120 strokes reduced committed SVG attribute changes from
+12,100 to 160 and measured boundary work from 66.0ms to 47.9ms total, with identical 2,640 saved
+confirmed points. Synthetic input disables delegated compositor trails; this is not device latency.
+The previous installed Huion build remains the comparison baseline. Physical Huion/Bigme testing
+belongs to the owner. Android Gradle Plugin still emits upstream Gradle deprecation warnings;
+no unverified toolchain migration was mixed into the ink cleanup.
+
+## 5 November 2026 — Standard live-ink batching and removal of retired formats
+
+Owner reports intermittent latency during continuous Huion pen strokes. Read-only Android
+graphics statistics show occasional slow frames, but do not identify the cause of the reported
+physical pen stutter. No automated gestures were performed on the physical device.
+
+Standard pointer input previously rebuilt/cleared/filled the full live outline for every
+pointer-move event. It now immediately ingests every delivered coalesced sample (including
+pressure, timestamps and tilt), while scheduling at most one outline redraw per animation frame.
+Contact still paints synchronously; the latest predicted tail is presentation-only, replaced on
+the next event, and never saved. Pen-up/cancel, tool changes, canvas clearing and destruction
+cancel and invalidate queued paints. The committed renderer and model, erasers, selection,
+Undo/Redo and Bigme daemon ownership are unchanged. This reduces redundant burst work; it does
+not make a long outline constant-cost or establish a physical latency improvement.
+
+Primary references checked:
+- Chrome input alignment: https://developer.chrome.com/blog/aligning-input-events/
+- Confirmed/coalesced/predicted event contract: https://www.w3.org/TR/pointerevents3/
+- Android native in-progress ink: https://developer.android.com/develop/ui/views/touch-and-input/stylus-input/ink-api-modules
+
+No desynchronized/front-buffer mode was enabled: Chrome documents tearing/flicker concerns,
+and this workspace clears a temporary canvas before committed SVG handoff. Native Android Ink
+API remains a candidate for a separate standard-provider implementation; adopting it needs a
+complete input/model/presentation handoff rather than another concurrent stroke owner.
+
+Per the owner's explicit new-app/no-backward-compatibility direction, removed Notes' handwriting
+upgrade loader, vector converter/API, upgrade backups/writes and associated retired-format tests.
+Removed version-0 sidecar upgrading and the embedded Markdown restoration-appendix importer.
+Current notebooks and ordinary Markdown import retain their paths. Unsupported notebook metadata
+is rejected before editor entry; no device notes were converted, deleted or reset. Existing format
+identifiers are kept because renaming current files adds work without simplifying the implementation.
+
+Validation: 755 writing tests, typecheck, regenerated Android assets, 165 Notes/content web tests
+and the full `tools/test-all.sh` Android suite pass. Standard and Bigme debug APKs build;
+Bigme Notes/runtime/provider checks also pass. Packaged current assets match source and the
+retired upgrade loader is absent from both APKs. A desktop Chromium
+burst fixture sends 1,440 moves across 120 frames: live redraws decrease from 1,441 to 121,
+with identical 1,257 confirmed saved points. Measured draw work in that one run is about 140ms
+before / 32ms after; this synthetic burst is not an on-device latency benchmark and disables
+delegated compositor trails because synthetic events are untrusted. Physical Huion pen testing
+and subsequent Bigme acceptance remain owner-run. The standard candidate was installed on the
+connected Huion Note E using `adb install --no-streaming -r`, preserving app data. Installed
+SHA256 matches `422abf48c76d5ff4df6eb8cca2c887d2f0e314a65bd0b52e8679c1de0c4fa0e3`.
+
+## 5 November 2026 — Native Android library presentation, first migration stage
+
+Fetched GitHub before editing: local `main` and `origin/main` matched `7ef0a41`; the only
+other remote branch (`codex/chatgpt-plan-support`) had no commits absent from local HEAD.
+Work is isolated on `codex/native-library`.
+
+Notes now presents ordinary notebook/folder shelf cards with Android views. Saved previews
+decode directly from the active storage root on one worker, sampled to card size, and a complete
+visible page is published together. This removes visible shelf thumbnail base64 transfer and
+WebView image/card construction on the native path. Card width/placement comes from the existing
+CSS shelf geometry; grayscale previews, rules, folder tabs/collages/counts and captions retain
+the existing appearance. Native taps, long press and folder drops delegate canonical JS actions.
+Revision/generation fences reject stale interactions and late decoding after navigation or release.
+The existing cache-holder service teardown owns native view/worker cleanup; no extra lifecycle
+layer or dependency was added.
+
+`-Pkalamos.nativeLibrary=true|false` controls the presentation at build time. Standard Android
+defaults to true; Bigme defaults to false for the initial standard-device review. The optional
+Bigme native-shelf build is a later testing candidate, not physical panel acceptance. Menus,
+selection mode, integration pickers and book/list/empty states retain their established web
+presentation. The JS library remains the sole owner of sorting, paging, storage mutations and
+notebook migration/routing. Writing, pen coordinates/pressure/hover, ink lifecycle, snapshots,
+refresh policy and generated writing assets are unchanged. This is a shelf migration, not a
+completed native writing-editor rewrite, and APK size/startup/pen-latency improvements are not measured.
+
+Validation: 752 writing tests and 168 Notes/content web tests pass. Native checks pass for
+Notes (128 tests, one skip), shared runtime (61), standard provider (6) and Bigme provider (23).
+Standard, ordinary Bigme and opt-in Bigme native-shelf debug APKs build. Robolectric renders
+the native shelf for visual inspection and covers host clamping, callbacks, cancellation/release,
+direct PNG loading and grayscale display without changing stored previews. Chromium compares the
+real web shelf layout to its native geometry payload at 360/674/900 CSS pixels, with matching
+widths, under 0.03px horizontal difference and under 3px row-position difference in those fixtures;
+creation-dialog open/cancel retires/restores native cards. The missing `tools/test-all.sh`
+referenced by repository rules now runs this export's own web, writing/typecheck and Android tests.
+Removed stale preview-script documentation and corrected obsolete notebook-numbering guidance.
+The standard native-shelf APK was subsequently installed on the connected Huion Note E with
+`adb install -r`, preserving app data. Installed SHA256 matches the build:
+`c6f5e14c182e79675e96973f13ce89811882073abafb08ed25d48bccdd066a64`.
+Physical pen/panel and device performance acceptance remain owner-run.
+
 ## 25 October 2026 — Notes ChatGPT plan support
 
 Notes-owned native account connection, explicit plan/API billing selection, encrypted OAuth vault and completed-only Responses formatting are described in [apps/notes/HANDOVER.md](apps/notes/HANDOVER.md). No feature, vendor or writing implementation was changed. Device acceptance and live account sign-in remain with the owner.

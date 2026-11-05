@@ -69,7 +69,7 @@ export type ValidationResult =
   | { ok: true; sidecar: Sidecar }
   | { ok: false; error: string };
 
-/** Validate a parsed object as a sidecar and migrate older versions forward. */
+/** Validate the current sidecar schema. Retired versions are not upgraded. */
 export function validateSidecar(input: unknown): ValidationResult {
   if (typeof input !== "object" || input === null) {
     return { ok: false, error: "Sidecar is not an object." };
@@ -82,26 +82,23 @@ export function validateSidecar(input: unknown): ValidationResult {
   if (typeof version !== "number") {
     return { ok: false, error: "Missing schema version." };
   }
-  if (version > SIDECAR_SCHEMA_VERSION) {
+  if (version !== SIDECAR_SCHEMA_VERSION) {
     return {
       ok: false,
-      error: `Sidecar schema v${version} is newer than this app (v${SIDECAR_SCHEMA_VERSION}).`,
+      error: `Unsupported sidecar schema v${version}; expected v${SIDECAR_SCHEMA_VERSION}.`,
     };
   }
 
-  let migrated:Sidecar;
-  try{migrated=migrate(obj);}catch(error){return {ok:false,error:error instanceof Error?error.message:'Invalid inline styles'};}
-  if (!Array.isArray(migrated.inkRuns) || !Array.isArray(migrated.blockAnchors)) {
+  if (!Array.isArray(obj.inkRuns) || !Array.isArray(obj.blockAnchors) || !Array.isArray(obj.unplacedInk)) {
     return { ok: false, error: "Sidecar is missing required arrays." };
   }
-  return { ok: true, sidecar: migrated as Sidecar };
+  try { return { ok: true, sidecar: normalizeSidecar(obj) }; }
+  catch(error) { return {ok:false,error:error instanceof Error?error.message:'Invalid inline styles'}; }
 }
 
-/** Placeholder migration chain — extend as the schema evolves. */
-function migrate(obj: Record<string, unknown>): Sidecar {
+/** Normalize editable current-schema fields at the persistence boundary. */
+function normalizeSidecar(obj: Record<string, unknown>): Sidecar {
   const out = { ...obj } as Sidecar;
-  // v0 -> v1: ensure unplacedInk exists.
-  if (!Array.isArray(out.unplacedInk)) out.unplacedInk = [];
   if (out.textBoxes !== undefined) out.textBoxes = Array.isArray(out.textBoxes)
     ? out.textBoxes.filter((b) => b && typeof b.id === "string" && typeof b.blockId === "string" && typeof b.text === "string" &&
       [b.x, b.y, b.width, b.size].every(Number.isFinite) && b.x >= 0 && b.y >= 0 && b.width > 0 && b.size > 0).map(({ gapBasis: _gapBasis, lineBasis: _lineBasis, ...b }: TextBox & { gapBasis?: unknown; lineBasis?: unknown }) => ({ ...b,
@@ -129,7 +126,6 @@ function migrate(obj: Record<string, unknown>): Sidecar {
       Number.isFinite(s.width) && s.width>0 && /^#[0-9a-f]{6}$/i.test(s.color) &&
       Array.isArray(s.points) && s.points.length>0 && s.points.every(p=>p && [p.x,p.y,p.t,p.pressure].every(Number.isFinite)) &&
       s.bounds && [s.bounds.x,s.bounds.y,s.bounds.width,s.bounds.height].every(Number.isFinite)))) : [];
-  out.schemaVersion = SIDECAR_SCHEMA_VERSION;
   return out;
 }
 

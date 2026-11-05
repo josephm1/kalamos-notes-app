@@ -730,7 +730,9 @@ function renderGrid() {
   const start = libraryPage * pageSize
   const visible = cells.slice(start, start + pageSize)
   primeCardMetaCache(visible)
-  visible.forEach(function(cell) {
+  // Native hosts share ordering, pagination and persistence with the web shelf.
+  const nativeRendered = window.AppLibrary?.renderNativeGrid?.(visible) === true
+  if (!nativeRendered) visible.forEach(function(cell) {
     grid.appendChild(cell.kind === 'folder' ? buildFolderCard(cell.data) : buildNotebookCard(cell.data))
   })
 

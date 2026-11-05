@@ -1,4 +1,4 @@
-// Vanilla port of src/reader/PaginatedReader.tsx. Pen-first paginated reader:
+// Pen-first paginated reader:
 // the pen taps a section to select it and Prev/Next buttons turn pages.
 
 import type { Block } from "../markdown/parse";

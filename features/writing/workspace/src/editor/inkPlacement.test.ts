@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { InkStroke } from "../ink/types";
 import {
   freeInkLaneIndex,
+  inkStrokesBounds,
+  translateInkStrokes,
   inkWordMatchScore,
   normalizeInkStrokes,
   packedInkTop,
@@ -22,6 +24,35 @@ function stroke(id: string, x: number, y: number): InkStroke {
 }
 
 describe("ruled ink placement", () => {
+  it("retains immutable stroke identities when normalization needs no translation", () => {
+    const strokes = [stroke("first", 4, 4), stroke("next", 10, 15)];
+    strokes[0].points.push({ x: 8, y: 8, t: 1, pressure: .5 });
+    expect(translateInkStrokes(strokes, 0, 0)).toBe(strokes);
+    const result = normalizeInkStrokes(strokes, 4);
+    expect(result.dx).toBe(0); expect(result.dy).toBe(0);
+    expect(result.strokes).toBe(strokes);
+  });
+
+  it("reuses completed geometry across layouts and new words, but recomputes edited stroke values", () => {
+    let reads = 0;
+    const old = stroke("old", 4, 4);
+    old.points = [
+      { get x() { reads++; return 4; }, get y() { reads++; return 4; }, t: 0, pressure: .5 },
+      { get x() { reads++; return 12; }, get y() { reads++; return 14; }, t: 1, pressure: .7 },
+    ];
+    const strokes = [old];
+    const first = inkStrokesBounds(strokes);
+    const scanned = reads;
+    expect(first).toEqual({ x: 4, y: 4, width: 8, height: 10 });
+    first.x = -999; // A consumer cannot mutate the cached bounds.
+    expect(inkStrokesBounds(strokes, 4)).toEqual({ x: 0, y: 0, width: 16, height: 18 });
+    inkStrokesBounds([...strokes, stroke("new", 20, 20)]);
+    expect(reads).toBe(scanned);
+    const moved = translateInkStrokes(strokes, 10, 20);
+    expect(inkStrokesBounds(moved)).toEqual({ x: 14, y: 24, width: 8, height: 10 });
+    expect(inkStrokesBounds(strokes)).toEqual({ x: 4, y: 4, width: 8, height: 10 });
+  });
+
   it("preserves an existing letter when a second stroke extends above it", () => {
     const oldTop = 50;
     const baselineOffset = 38;

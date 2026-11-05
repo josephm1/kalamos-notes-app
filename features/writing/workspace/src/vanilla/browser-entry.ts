@@ -1,5 +1,4 @@
-// Browser entry for vanilla.html — the pre-seam behavior: #app host,
-// welcome screen, File System Access open/save, IndexedDB persistence.
+// Browser preview uses the same DOM editor as both Android device builds.
 
 import { createApp } from "./main";
 import { browserStore } from "../documents/browserStore";

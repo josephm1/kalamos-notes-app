@@ -18,7 +18,6 @@ function harness({returned=false,stale=false,transcription=false,nativeMode=fals
  w.Bridge={showToast(){},getNotebookFile(){return '{"active":0,"pages":[{"id":"first"}]}'}}
  w.AppLibrary={};w.KalamosAppHooks={onLibraryReady(){}};w.AppMode={onResumeApp(){},openNotebook(){return true}}
  w.App={showLibrary(){},showEditor(){}};w.libraryData={notebooks:[{notebookId:'note',title:'Tasks'}],folders:[]}
- w.KalamosNotesMigration={ensure(){}}
  w.KalamosWriteWorkspace={async exportSavedDocumentPage(){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 480"></svg>'},async exportDocumentPage(){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 480"></svg>'},isOpen(){return false},async checkpointWorkspace(){},async setDocumentDialog(active){dialogs.push(active)},close(){},async closeAndWait(){},async commitNotebookRevision(id,commit){return await commit()},async materializeNotebookSemantic(id,blocks){return[{source:'',sidecar:{textBoxes:blocks}}]}}
  const shelf=readFileSync(new URL('../../../foundation/android-runtime/src/main/assets/web/js/library-controller.js',import.meta.url),'utf8')
  w.renderNoteThumb=(element,id)=>{element.dataset.previewId=id};w.timeAgo=()=> 'Recently';w.libraryCardTimestamp=()=>'';w.libraryItemsPerPage=()=>9

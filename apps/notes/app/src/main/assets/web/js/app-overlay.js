@@ -7,7 +7,6 @@
 document.write('<link rel="stylesheet" href="css/write-workspace.css">');
 document.write('<link rel="stylesheet" href="css/notes-writing-ui.css">');
 document.write('<script src="js/write-workspace.js"><\/script>');
-document.write('<script src="js/notebook-migration.js"><\/script>');
 (function () {
   'use strict'
 
@@ -34,12 +33,13 @@ document.write('<script src="js/notebook-migration.js"><\/script>');
   window.AppMode = {
     openNotebook: function (id) {
       try {
-        window.KalamosNotesMigration.ensure(id)
+        const notebook = Storage.loadMeta(id)
+        if (!notebook || notebook.kind !== 'planning') throw new Error('Unsupported notebook format')
         const editor = planningEditor()
         if (!editor) throw new Error('Writing editor is unavailable')
         editor.openWorkspaceNotebook(id)
       } catch (error) { toast('Notebook could not be opened: ' + error.message) }
-      // A failed migration must stay on the shelf, never fall through to a blank legacy editor.
+      // An invalid notebook stays on the shelf rather than opening a blank editor.
       return true
     },
     onNewIntent: function () { void receiveSharedMarkdown() },
@@ -656,7 +656,6 @@ document.write('<script src="js/notebook-migration.js"><\/script>');
     try {
       const nb = Storage.loadMeta(target.notebookId)
       if(!nb) return
-      window.KalamosNotesMigration.ensure(target.notebookId)
       const pages = await planningEditor().exportNotebookPages(target.notebookId)
       const html = '<!doctype html><html><head><meta charset="utf-8"><title>'+escapeDocumentText(nb.title)+'</title><style>@page{size:A4;margin:0}body{margin:0;background:white}section{page-break-after:always;width:210mm;height:297mm;display:flex;align-items:flex-start;justify-content:center}section:last-child{page-break-after:auto}svg{width:100%;height:100%;object-fit:contain}@media screen{section{width:100%;height:auto;aspect-ratio:210/297}svg{width:100%;height:auto;aspect-ratio:210/297}}</style></head><body>'+pages.map(function(svg){return '<section>'+svg+'</section>'}).join('')+'</body></html>'
       Bridge.exportDocumentPdf(nb.title,html)
@@ -664,7 +663,6 @@ document.write('<script src="js/notebook-migration.js"><\/script>');
   }
   async function shareNotebookMarkdown(target) {
     try {
-      window.KalamosNotesMigration.ensure(target.notebookId)
       const text = await planningEditor().getNotebookMarkdown(target.notebookId)
       if(!text.trim())throw new Error('This note has no Markdown text. Use Share to send its pages as images.')
       const result = AB.call('notes.share.markdown', {title:target.title||'Notebook',text:text})
@@ -683,23 +681,13 @@ document.write('<script src="js/notebook-migration.js"><\/script>');
   window.onMarkdownImported = async function(imported) {
     try {
       if(typeof imported === 'string') imported=JSON.parse(imported)
-      let source=imported.text, sidecar, sheets
-      if(typeof source !== 'string' || source.includes('\u0000')) throw new Error('Choose a Markdown text file')
-      const match=source.match(/\n\n<!-- kalamos-planning:start -->\n<!-- kalamos-planning:([^\n]+) -->/)
-      if(match) {
-        const record=JSON.parse(decodeURIComponent(match[1]))
-        // Keep edits made in another Markdown editor; only restore embedded placement when
-        // the readable source still matches the original export.
-        source=source.slice(0,match.index)
-        if(source === record.source) { sidecar=record.sidecar; sheets=record.sheets }
-      }
-      if(!sheets && !sidecar) {
-        sheets=await planningEditor().createMarkdownSheets(source,(imported.name||'Imported note').replace(/\.(md|markdown)$/i,''))
-        if(!sheets.length)throw Error('No editable Markdown content')
-        source=sheets[0].source;sidecar=sheets[0].sidecar
-      }
+      const title=(imported.name||'Imported note').replace(/\.(md|markdown)$/i,'')
+      if(typeof imported.text !== 'string' || imported.text.includes('\u0000')) throw new Error('Choose a Markdown text file')
+      const sheets=await planningEditor().createMarkdownSheets(imported.text,title)
+      if(!sheets.length)throw Error('No editable Markdown content')
+      const {source,sidecar}=sheets[0]
       if(planningEditor()?.isOpen())await planningEditor().closeAndWait(true)
-      return createPlanningNotebook((imported.name||'Imported note').replace(/\.(md|markdown)$/i,''),{source:source,sidecar:sidecar,sheets:sheets,notebookId:imported.notebookId})
+      return createPlanningNotebook(title,{source,sidecar,sheets,notebookId:imported.notebookId})
     } catch(e) { toast('Markdown import failed: '+e.message) }
   }
 
@@ -746,3 +734,5 @@ document.write('<script src="js/agora-documents.js"><\/script>');
 
 document.write('<script src="js/notes-ai-settings.js"><\/script>');
 document.write('<script src="js/notes-attachments.js"><\/script>');
+
+document.write('<script src="js/notes-native-library.js"><\/script>');

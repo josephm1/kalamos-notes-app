@@ -1,6 +1,4 @@
-// Vanilla port of src/reader/inline.tsx. Same matching logic (image, link,
-// inline code, strong, emphasis), producing real DOM nodes instead of React
-// elements. No raw HTML is injected — every node is built with createElement.
+// Render inline Markdown as DOM nodes. Raw HTML is never injected.
 
 import type { Block } from "../markdown/parse";
 

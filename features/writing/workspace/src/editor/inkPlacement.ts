@@ -1,13 +1,31 @@
-import type { InkStroke } from "../ink/types";
+import type { InkStroke, Bounds } from "../ink/types";
 import { boundsOfPoints, boundsUnion, emptyBounds } from "../ink/types";
 
-function strokeBounds(strokes: InkStroke[]) {
-  let bounds = emptyBounds();
-  for (const stroke of strokes) bounds = boundsUnion(bounds, boundsOfPoints(stroke.points));
-  return bounds;
+// Completed strokes and their containing arrays are immutable model values. Geometry edits
+// replace them; live pointer arrays never enter this cache. Weak keys retain no extra history.
+const strokeBoundsCache = new WeakMap<InkStroke, Bounds>();
+const runBoundsCache = new WeakMap<InkStroke[], Bounds>();
+
+export function inkStrokesBounds(strokes: InkStroke[], pad = 0): Bounds {
+  let bounds = runBoundsCache.get(strokes);
+  if (!bounds) {
+    bounds = emptyBounds();
+    for (const stroke of strokes) {
+      let next = strokeBoundsCache.get(stroke);
+      if (!next) {
+        next = boundsOfPoints(stroke.points);
+        strokeBoundsCache.set(stroke, next);
+      }
+      bounds = boundsUnion(bounds, next);
+    }
+    runBoundsCache.set(strokes, bounds);
+  }
+  if (!strokes.length) return { ...bounds };
+  return { x: bounds.x - pad, y: bounds.y - pad, width: bounds.width + pad * 2, height: bounds.height + pad * 2 };
 }
 
 export function translateInkStrokes(strokes: InkStroke[], dx: number, dy: number): InkStroke[] {
+  if (dx === 0 && dy === 0) return strokes;
   return strokes.map((stroke) => ({
     ...stroke,
     points: stroke.points.map((point) => ({ ...point, x: point.x + dx, y: point.y + dy })),
@@ -23,7 +41,7 @@ export function translateInkStrokes(strokes: InkStroke[], dx: number, dy: number
  */
 export function normalizeInkStrokes(strokes: InkStroke[], pad: number) {
   if (strokes.length === 0) return { strokes, dx: 0, dy: 0 };
-  const bounds = strokeBounds(strokes);
+  const bounds = inkStrokesBounds(strokes);
   const dx = pad - bounds.x;
   const dy = pad - bounds.y;
   return { strokes: translateInkStrokes(strokes, dx, dy), dx, dy };

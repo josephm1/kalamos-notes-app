@@ -32,6 +32,8 @@ Generated assets live in `features/writing/android`; do not edit them directly.
 ## Checks
 
 ```bash
+./tools/test-all.sh
+# Or run focused Notes checks:
 node --test --test-concurrency=1 apps/notes/tests/*.test.mjs
 ./gradlew :apps:notes:testDebugUnitTest
 ```

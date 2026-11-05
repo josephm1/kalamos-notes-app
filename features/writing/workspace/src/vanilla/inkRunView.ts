@@ -1,4 +1,4 @@
-// Vanilla port of src/reader/InkRunView.tsx.
+// Render committed vector runs in the document view.
 
 import type { InlineInkRun } from "../ink/types";
 import { outlinePathD, strokeOutline } from "../ink/geometry";

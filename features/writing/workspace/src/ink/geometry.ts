@@ -6,7 +6,16 @@
 // See BUILD_PLAN.md §9 "Ink representation".
 
 import type { InkPoint, InkStroke } from "./types";
-import { pressureToWidth } from "./render";
+/**
+ * Map raw pressure through a gentle curve with a nonzero minimum, so devices
+ * that report poor or constant pressure still produce a legible line.
+ * (BUILD_PLAN.md §9 "Ink representation".)
+ */
+function pressureToWidth(base: number, pressure: number): number {
+  const p = Number.isFinite(pressure) && pressure > 0 ? pressure : 0.5;
+  const curved = 0.4 + 0.6 * Math.sqrt(p); // min 40% of base width
+  return base * curved;
+}
 
 export type XY = { x: number; y: number };
 

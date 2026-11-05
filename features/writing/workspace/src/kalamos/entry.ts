@@ -35,7 +35,6 @@ import { savePaginatedSheet } from "./sheetPagination";
 import { validateSidecar } from "../sidecar/schema";
 import { parseCustomNotebookTemplates } from "../editor/customNotebookTemplates";
 import { GUIDE_DOC } from "./guideDoc";
-import { convertLegacyPage } from "./legacyNotebook";
 
 export type KalamosWriteWorkspaceApi = {
   materializeSemantic: typeof materializeSemantic;
@@ -45,7 +44,6 @@ export type KalamosWriteWorkspaceApi = {
   materializeNotebookTranscription(notebookId:string,blocks:TranscriptionBlock[],regions:InkRegion[],sourceLines?:boolean):Promise<TranscriptionSheet[]>;
   bindNotebookMarkdown(notebookId:string,markdown:string,regions:InkRegion[],namespace?:string):Promise<{blocks:TranscriptionBlock[];sourceLines:boolean}>;
   projectSemantic: typeof projectSemantic;
-  convertLegacyPage: typeof convertLegacyPage;
   templates: typeof NOTEBOOK_TEMPLATES;
   registerCustomTemplates(entries: unknown): {id:string;name:string;category:string}[];
   createTemplate(id: string, title: string): Promise<ReturnType<typeof createNotebookTemplate>>;
@@ -604,7 +602,6 @@ const api: KalamosWriteWorkspaceApi = {
     const height=index.sheetHeight||paper?.clientHeight||Math.max(lineHeight*2,window.innerHeight-64);
     return materializeSemantic(blocks,title,width,height,lineHeight,{paperWidth:width,paperHeight:height});
   },
-  convertLegacyPage,
   templates: NOTEBOOK_TEMPLATES,
   async createTemplate(id, title) {
     const prefs = await workspaceStore.loadPreferences();

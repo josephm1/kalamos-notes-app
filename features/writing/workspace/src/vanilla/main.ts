@@ -1,23 +1,16 @@
 import type { DocumentAction } from "./documentActions";
 import type { Attachment, PageAttachment, AudioStatus } from "../editor/pageAttachments";
 import type { PageObject } from "../editor/pageObjects";
-// Vanilla shell — mirrors a slice of src/app/App.tsx: open a document, render
-// it with PaginatedReader, open the focused PenWorkspace on a block, commit
-// edits back through the same pure commit.ts used by the React app, and
-// autosave through the DocStore seam. React remains the feature-complete
-// reference.
-//
-// The module is a factory (`createApp`) so the same shell runs in two
-// chromes: "browser" (vanilla.html — welcome screen, Open/Save buttons,
-// IndexedDB recovery via browserStore) and "kalamos" (the Bigme device build
-// — the Kalamos library is the landing surface, storage is the native
-// bridge, saving is implicit).
+// Canonical document shell: read a document, edit a block, checkpoint through the pure
+// commit model, and autosave through DocStore. Browser QA and both Android providers use
+// this same editor. Browser chrome owns Open/Save and IndexedDB recovery; Android chrome
+// owns notebook routing and native storage.
 
 import "./eink.css";
 import { parseMarkdown, type Block } from "../markdown/parse";
 import { PaginatedReader } from "./paginatedReader";
 import { PenWorkspace, type Tool, type HwrClient, type WorkspacePageTools } from "./penWorkspace";
-import type { CommitPayload } from "../editor/PenWorkspace";
+import type { CommitPayload } from "../editor/commitPayload";
 import { commitBlockEdit } from "../app/commit";
 import { History } from "../app/history";
 import {
@@ -507,7 +500,7 @@ export function createApp(host: HTMLElement, opts: CreateAppOptions): VanillaApp
     const h1 = document.createElement("h1");
     h1.textContent = "Kalamos Write";
     const p = document.createElement("p");
-    p.textContent = "Vanilla-JS / e-ink preview shell. React remains the feature-complete reference.";
+    p.textContent = "Open a Markdown document to read, write and edit.";
     const actions = document.createElement("div");
     actions.className = "v-actions";
     const openFileBtn = document.createElement("button");

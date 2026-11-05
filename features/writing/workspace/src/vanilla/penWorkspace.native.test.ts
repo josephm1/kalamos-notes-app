@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { parseMarkdown } from "../markdown/parse";
 import { DEFAULT_PREFERENCES } from "../storage/preferences";
 import { PenWorkspace, type HwrResult } from "./penWorkspace";
-import type { CommitPayload } from "../editor/PenWorkspace";
+import type { CommitPayload } from "../editor/commitPayload";
 import {
   boundsOfPoints,
   type InkPoint,

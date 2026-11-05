@@ -3,7 +3,7 @@ import { PenWorkspace } from './penWorkspace';
 import { createNotebookTemplate } from '../editor/notebookTemplates';
 import { DEFAULT_PREFERENCES } from '../storage/preferences';
 import { parseMarkdown } from '../markdown/parse';
-import type { CommitPayload } from '../editor/PenWorkspace';
+import type { CommitPayload } from '../editor/commitPayload';
 const workspaces: PenWorkspace[] = [];
 beforeAll(() => {
   (HTMLCanvasElement.prototype as unknown as {getContext:()=>unknown}).getContext = () => ({font:'',measureText:(text:string)=>({width:text.length*8}),setTransform(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},stroke(){},fill(){},arc(){}});
